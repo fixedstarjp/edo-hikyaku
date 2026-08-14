@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>江戸飛脚 — 日本橋より品川宿へ</title>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+
+    <div id="hud" hidden>
+      <div class="hud-top">
+        <div class="panel panel-koku">
+          <div class="koku" id="koku">七つ</div>
+          <div class="clock" id="clock">—</div>
+        </div>
+        <div class="panel panel-progress">
+          <div class="progress-head">
+            <span id="next-landmark">日本橋</span>
+            <span id="remaining">残り 8.2 km</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+            <div class="progress-marks" id="progress-marks"></div>
+          </div>
+        </div>
+        <div class="panel panel-deadline" id="deadline">
+          <div class="deadline-label">高輪大木戸 閉門まで</div>
+          <div class="deadline-value" id="deadline-value">—</div>
+        </div>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="gauge">
+          <div class="gauge-label">息</div>
+          <div class="gauge-track"><div class="gauge-fill" id="stamina-fill"></div></div>
+        </div>
+        <div class="readout">
+          <span id="speed">0.0 km/h</span>
+          <span id="grade">±0 ‰</span>
+          <span id="elevation">標高 0 m</span>
+        </div>
+      </div>
+
+      <div id="toast"></div>
+      <div id="banner" hidden>
+        <div class="banner-name" id="banner-name"></div>
+        <div class="banner-note" id="banner-note"></div>
+      </div>
+    </div>
+
+    <div id="title-screen">
+      <div class="title-inner">
+        <p class="title-kicker">東海道五十七次 · 第一区間</p>
+        <h1>江戸飛脚</h1>
+        <p class="title-sub">日本橋 &mdash; 品川宿 &nbsp;二里</p>
+        <p class="title-brief" id="title-brief">街道データを読み込んでいます…</p>
+        <div class="title-keys">
+          <div><kbd>W</kbd>/<kbd>↑</kbd> 走る</div>
+          <div><kbd>Shift</kbd> 全力</div>
+          <div><kbd>S</kbd>/<kbd>↓</kbd> 緩める</div>
+          <div><kbd>A</kbd><kbd>D</kbd> 避ける</div>
+          <div><kbd>Space</kbd> 跳ぶ</div>
+        </div>
+        <button id="start-button" disabled>出立</button>
+        <p class="title-credit">標高: 国土地理院 標高タイル / 街道線形: 旧東海道の現況をデジタイズ</p>
+      </div>
+    </div>
+
+    <div id="result-screen" hidden>
+      <div class="title-inner">
+        <h1 id="result-title">着</h1>
+        <p class="result-sub" id="result-sub"></p>
+        <table class="result-table" id="result-table"></table>
+        <button id="retry-button">もう一度走る</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
