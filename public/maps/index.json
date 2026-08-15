@@ -1,0 +1,32 @@
+{
+  "koshu-01": {
+    "id": "koshu-01",
+    "image": "maps/koshu-01.png",
+    "zoom": 15,
+    "tileSize": 256,
+    "originPx": {
+      "x": 7449531,
+      "y": 3302701
+    },
+    "size": {
+      "w": 1885,
+      "h": 605
+    },
+    "attribution": "地理院タイル"
+  },
+  "tokaido-01": {
+    "id": "tokaido-01",
+    "image": "maps/tokaido-01.png",
+    "zoom": 15,
+    "tileSize": 256,
+    "originPx": {
+      "x": 7450328,
+      "y": 3303045
+    },
+    "size": {
+      "w": 1088,
+      "h": 2094
+    },
+    "attribution": "地理院タイル"
+  }
+}

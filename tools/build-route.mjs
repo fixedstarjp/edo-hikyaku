@@ -1,29 +1,32 @@
 /**
  * 街道データのビルド。
  *
- *   data/route-*.json (手動デジタイズの緯度経度)
+ *   data/routes/*.json (手動デジタイズの緯度経度)
  *     -> 等間隔リサンプル
  *     -> 国土地理院 標高タイルから標高を取得
  *     -> ローカル平面座標へ投影
- *     -> src/data/route-01.generated.json
+ *     -> 名所名で書かれた道幅・区間・行列の位置を里程へ解決
+ *     -> src/data/<id>.generated.json
+ *     -> src/data/routes.generated.json (一覧)
  *
  * 標高タイルは .cache/dem/ にキャッシュするので、二度目以降は通信しない。
  *
  * 出典: 国土地理院 標高タイル (DEM5A / DEM10B)
  *       https://maps.gsi.go.jp/development/ichiran.html
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const SRC = resolve(ROOT, 'data/route-01-nihonbashi-shinagawa.json');
-const OUT = resolve(ROOT, 'src/data/route-01.generated.json');
+const SRC_DIR = resolve(ROOT, 'data/routes');
+const OUT_DIR = resolve(ROOT, 'src/data');
 const CACHE = resolve(ROOT, '.cache/dem');
 
-/** リサンプル間隔 (m)。8km を約 530 点にする。 */
+/** リサンプル間隔 (m)。 */
 const STEP_M = 15;
+
 /**
  * 標高の平滑化。
  * 都市部の DEM は掘割・高架・再開発の造成を拾うため、数十 m 幅のスパイクが出る。
@@ -71,7 +74,6 @@ function resample(waypoints, stepM) {
 
 /* ------------------------------------------------------- 国土地理院 DEM タイル */
 
-/** 標高タイルのセット。上から順に試し、欠測なら次へ落とす。 */
 const DEM_SETS = [
   { name: 'dem5a_png', zoom: 15, label: 'DEM5A (5m メッシュ)' },
   { name: 'dem_png', zoom: 14, label: 'DEM10B (10m メッシュ)' },
@@ -105,7 +107,6 @@ async function loadTile(set, zoom, x, y) {
     const url = `https://cyberjapandata.gsi.go.jp/xyz/${set}/${zoom}/${x}/${y}.png`;
     const res = await fetch(url);
     if (res.status === 404) {
-      // タイル自体が存在しない (海上など)
       tileCache.set(key, null);
       return null;
     }
@@ -124,11 +125,8 @@ async function loadTile(set, zoom, x, y) {
 /** 標高タイルの RGB を標高 (m) に復号する。欠測は null。 */
 function decodeElevation(png, px, py) {
   const i = (png.width * py + px) << 2;
-  const r = png.data[i];
-  const g = png.data[i + 1];
-  const b = png.data[i + 2];
-  const v = r * 65536 + g * 256 + b;
-  if (v === 0x800000) return null; // 欠測
+  const v = png.data[i] * 65536 + png.data[i + 1] * 256 + png.data[i + 2];
+  if (v === 0x800000) return null;
   return v < 0x800000 ? v * 0.01 : (v - 0x1000000) * 0.01;
 }
 
@@ -145,24 +143,23 @@ async function elevationAt(lat, lon) {
 
 /* -------------------------------------------------------------------- 投影 */
 
-/** route 中心を原点とする局所平面座標。x=東(m), z=南(m)。8km 程度なら誤差は無視できる。 */
-function makeProjector(lat0, lon0) {
-  const kx = R_EARTH * DEG * Math.cos(lat0 * DEG);
-  const kz = R_EARTH * DEG;
-  return (lat, lon) => ({
-    x: (lon - lon0) * kx,
-    z: (lat0 - lat) * kz,
-  });
+/** route 起点を原点とする局所平面座標。x=東(m), z=南(m)。10km 程度なら誤差は無視できる。 */
+function projectionFor(lat0, lon0) {
+  return {
+    lat0,
+    lon0,
+    kx: R_EARTH * DEG * Math.cos(lat0 * DEG),
+    kz: R_EARTH * DEG,
+  };
 }
 
-/* -------------------------------------------------------------------- 本体 */
+/* -------------------------------------------------------------------- 補助 */
 
 function medianFilter(values, window) {
   const half = window >> 1;
   return values.map((_, i) => {
-    const lo = Math.max(0, i - half);
-    const hi = Math.min(values.length, i + half + 1);
-    const w = values.slice(lo, hi).sort((a, b) => a - b);
+    const w = values.slice(Math.max(0, i - half), Math.min(values.length, i + half + 1))
+      .sort((a, b) => a - b);
     return w[w.length >> 1];
   });
 }
@@ -183,12 +180,15 @@ function movingAverage(values, window) {
 
 const round = (v, d = 2) => Number(v.toFixed(d));
 
-async function main() {
-  const route = JSON.parse(readFileSync(SRC, 'utf8'));
-  const { points, totalLength } = resample(route.waypoints, STEP_M);
-  console.log(`${route.name}: ${points.length} 点 / 実延長 ${(totalLength / 1000).toFixed(3)} km`);
+/* -------------------------------------------------------------------- 本体 */
 
-  process.stdout.write('標高タイル取得');
+async function buildRoute(file) {
+  const route = JSON.parse(readFileSync(file, 'utf8'));
+  const { points, totalLength } = resample(route.waypoints, STEP_M);
+  console.log(`\n[${route.id}] ${route.road} ${route.name}`);
+  console.log(`  ${points.length} 点 / 実延長 ${(totalLength / 1000).toFixed(3)} km`);
+
+  process.stdout.write('  標高タイル取得');
   const sources = new Set();
   const rawElev = [];
   for (const [lat, lon] of points) {
@@ -196,7 +196,7 @@ async function main() {
     rawElev.push(h);
     sources.add(source);
   }
-  console.log(` 完了 (${[...sources].join(', ')})`);
+  console.log(` 完了`);
 
   const elev = movingAverage(medianFilter(rawElev, MEDIAN_WINDOW), SMOOTH_WINDOW);
 
@@ -206,14 +206,11 @@ async function main() {
     for (let i = 0; i < points.length; i++) {
       const d = haversine(ov.at, points[i]);
       if (d >= ov.radiusM) continue;
-      // 余弦の裾で滑らかに立ち上げる
       elev[i] += ov.raiseM * 0.5 * (1 + Math.cos((d / ov.radiusM) * Math.PI));
     }
   }
 
-  const lat0 = points[0][0];
-  const lon0 = points[0][1];
-  const project = makeProjector(lat0, lon0);
+  const projection = projectionFor(points[0][0], points[0][1]);
 
   const s = [];
   const xs = [];
@@ -222,11 +219,10 @@ async function main() {
   let acc = 0;
   for (let i = 0; i < points.length; i++) {
     if (i > 0) acc += haversine(points[i - 1], points[i]);
-    const p = project(points[i][0], points[i][1]);
     s.push(round(acc, 2));
-    xs.push(round(p.x, 2));
+    xs.push(round((points[i][1] - projection.lon0) * projection.kx, 2));
     ys.push(round(elev[i], 2));
-    zs.push(round(p.z, 2));
+    zs.push(round((projection.lat0 - points[i][0]) * projection.kz, 2));
   }
 
   // 勾配 (‰)。中央差分。
@@ -248,15 +244,30 @@ async function main() {
         best = i;
       }
     }
-    return {
-      ...lm,
-      s: s[best],
-      x: xs[best],
-      y: ys[best],
-      z: zs[best],
-      snapError: round(bestD, 1),
-    };
+    return { ...lm, s: s[best], x: xs[best], y: ys[best], z: zs[best], snapError: round(bestD, 1) };
   });
+
+  const byName = new Map(landmarks.map((lm) => [lm.name, lm]));
+  const sOf = (name) => {
+    if (name === null || name === undefined) return totalLength;
+    const lm = byName.get(name);
+    if (!lm) throw new Error(`[${route.id}] 名所 "${name}" が見つからない`);
+    return lm.s;
+  };
+
+  // 名所名で書かれた表を里程へ解決する。
+  const width = (route.width ?? []).map((w) => [sOf(w.at), w.m]);
+  let from = 0;
+  const sections = (route.sections ?? []).map((sec) => {
+    const to = sOf(sec.until);
+    const out = { ...sec, from, to };
+    from = to;
+    return out;
+  });
+  const processions = (route.processions ?? []).map((p) => ({
+    ...p,
+    center: round(sOf(p.at) + (p.offset ?? 0), 1),
+  }));
 
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
@@ -265,9 +276,12 @@ async function main() {
   const out = {
     meta: {
       id: route.id,
+      road: route.road,
+      stage: route.stage,
       name: route.name,
       from: route.from,
       to: route.to,
+      summary: route.summary,
       historicalDistance: route.historicalDistance,
       note: route.note,
       generatedAt: new Date().toISOString().slice(0, 10),
@@ -278,29 +292,62 @@ async function main() {
       elevationOverrides: route.elevationOverrides ?? [],
       attribution: '標高: 国土地理院 標高タイル',
     },
-    origin: { lat: lat0, lon: lon0 },
+    projection,
+    startTimeMinutes: route.startTimeMinutes,
+    gate: route.gate ?? null,
     totalLength: round(totalLength, 1),
-    stats: {
-      minElevation: round(minY),
-      maxElevation: round(maxY),
-      maxGradePermil: maxGrade,
-    },
+    stats: { minElevation: round(minY), maxElevation: round(maxY), maxGradePermil: maxGrade },
+    width,
+    sections,
+    processions,
     shoreline: route.shoreline ?? null,
     samples: { s, x: xs, y: ys, z: zs, grade },
     landmarks,
   };
 
-  mkdirSync(dirname(OUT), { recursive: true });
-  writeFileSync(OUT, JSON.stringify(out));
+  mkdirSync(OUT_DIR, { recursive: true });
+  writeFileSync(resolve(OUT_DIR, `${route.id}.generated.json`), JSON.stringify(out));
 
-  console.log(`標高 ${out.stats.minElevation}m 〜 ${out.stats.maxElevation}m / 最急勾配 ${maxGrade}‰`);
-  console.log('里程の照合: 実測 %s km / 史料 %s km (二里)',
-    (totalLength / 1000).toFixed(2), route.historicalDistance.km);
-  console.log('ランドマークのスナップ誤差 (m):');
+  console.log(`  標高 ${out.stats.minElevation}m 〜 ${out.stats.maxElevation}m / 最急勾配 ${maxGrade}‰`);
+  console.log(`  里程 実測 ${(totalLength / 1000).toFixed(2)} km / 史料 ${route.historicalDistance.km} km`);
+  const worst = Math.max(...landmarks.map((l) => l.snapError));
+  console.log(`  名所 ${landmarks.length} 箇所 (最大スナップ誤差 ${worst}m)`);
   for (const lm of landmarks) {
-    console.log(`  ${String(lm.s).padStart(7)}m  ${lm.name}  (誤差 ${lm.snapError}m, 標高 ${lm.y}m)`);
+    console.log(`    ${String(Math.round(lm.s)).padStart(5)}m  標高 ${String(lm.y).padStart(6)}m  ${lm.name}`);
   }
-  console.log(`\n-> ${OUT}`);
+
+  return {
+    id: route.id,
+    road: route.road,
+    stage: route.stage,
+    order: route.order ?? 99,
+    name: route.name,
+    from: route.from,
+    to: route.to,
+    summary: route.summary,
+    totalLength: out.totalLength,
+    historicalDistance: route.historicalDistance,
+    stats: out.stats,
+  };
+}
+
+async function main() {
+  const files = readdirSync(SRC_DIR)
+    .filter((f) => f.endsWith('.json'))
+    .sort()
+    .map((f) => resolve(SRC_DIR, f));
+
+  const manifest = [];
+  for (const file of files) {
+    manifest.push(await buildRoute(file));
+  }
+  manifest.sort((a, b) => a.order - b.order);
+
+  writeFileSync(
+    resolve(OUT_DIR, 'routes.generated.json'),
+    JSON.stringify({ generatedAt: new Date().toISOString().slice(0, 10), routes: manifest }, null, 2)
+  );
+  console.log(`\n${manifest.length} 街道を出力した -> ${OUT_DIR}`);
 }
 
 main().catch((err) => {

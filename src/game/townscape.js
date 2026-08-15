@@ -15,14 +15,6 @@ import { mergeGeometries, roofPrism } from '../core/geometry.js';
  * それぞれ InstancedMesh 一つにまとめるので、千軒建てても描画は五回で済む。
  */
 
-const SECTIONS = [
-  { from: 0, to: 2505, kind: 'machiya', spacing: 6.5, gap: 0.05, storeys: 2 },
-  { from: 2505, to: 4245, kind: 'machiya', spacing: 8.0, gap: 0.14, storeys: 2 },
-  { from: 4245, to: 5639, kind: 'yashiki', spacing: 13, gap: 0.22, storeys: 1 },
-  { from: 5639, to: 7379, kind: 'kaido', spacing: 22, gap: 0.5, storeys: 1 },
-  { from: 7379, to: 99999, kind: 'shuku', spacing: 6.0, gap: 0.04, storeys: 2 },
-];
-
 const WALL_COLORS = [0xcabb9c, 0xbdaf92, 0xae9f83, 0xd2c4a6, 0xb6a98f];
 const ROOF_COLORS = [0x3f434a, 0x494d54, 0x55503f, 0x383c42, 0x635842];
 const NOREN_COLORS = [0x2c4a72, 0x8f3a28, 0x2f3a33, 0x574063, 0x7a5a26];
@@ -33,9 +25,11 @@ export function buildTownscape(route, materials) {
 
   const parts = { bodies: [], roofs: [], eaves: [], fronts: [], norens: [], pines: [] };
   const sample = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
-  const nearLandmark = (s) => route.landmarks.some((lm) => Math.abs(lm.s - s) < 26);
+  const clearZones = keepClearZones(route);
+  const blocked = (s, side) =>
+    clearZones.some((z) => s > z.from && s < z.to && (z.side === 0 || z.side === side));
 
-  for (const sec of SECTIONS) {
+  for (const sec of route.sections) {
     const to = Math.min(sec.to, route.length);
     for (let s = sec.from; s < to; s += sec.spacing) {
       for (const side of [-1, 1]) {
@@ -44,7 +38,7 @@ export function buildTownscape(route, materials) {
         // 街道の東は汀線が近ければ建てられない
         if (side > 0 && shore < half + 22 && rng.chance(0.85)) continue;
         if (rng.chance(sec.gap)) continue;
-        if (nearLandmark(s)) continue;
+        if (blocked(s, side)) continue;
 
         route.sample(s + rng.range(-1.2, 1.2), 0, sample);
 
@@ -97,6 +91,28 @@ export function buildTownscape(route, materials) {
     group.add(instanced(pineFoliageGeometry(), materials.foliage, parts.pines.map((p) => p.foliage)));
   }
   return group;
+}
+
+/**
+ * 名所のために沿道を空けておく範囲。
+ * 橋や大木戸の周りは両側を、堀は水のある側だけを空ける。
+ * side は 0 が両側、+1/-1 が片側。
+ */
+function keepClearZones(route) {
+  const zones = [];
+  for (const lm of route.landmarks) {
+    if (lm.moat) {
+      const half = lm.moat.lengthM / 2 + 20;
+      zones.push({ from: lm.s - half, to: lm.s + half, side: lm.moat.side });
+    }
+    // 名所そのものの足元は必ず空ける
+    zones.push({ from: lm.s - 26, to: lm.s + 26, side: 0 });
+    // 坂の石垣のように片側だけ長く空けたいものは clearSide を指定する
+    if (lm.clearM) {
+      zones.push({ from: lm.s - lm.clearM, to: lm.s + lm.clearM, side: lm.clearSide ?? 0 });
+    }
+  }
+  return zones;
 }
 
 /* ------------------------------------------------------------------ 部品 */

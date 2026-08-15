@@ -14,11 +14,6 @@ import { instanced } from './townscape.js';
 
 const TOWNSFOLK_COLORS = [0x5b6b7a, 0x7a6a58, 0x4f5b4a, 0x8a7a63, 0x6a5566, 0x3f4a5c, 0x8f6f56];
 
-/** 大名行列に行き合う場所。里程で指定する。 */
-const PROCESSIONS = [
-  { center: 3050, members: 34, note: '芝口を行く大名行列' },
-  { center: 6350, members: 28, note: '高輪を行く大名行列' },
-];
 
 export class Crowd {
   constructor(route, materials) {
@@ -51,13 +46,22 @@ export class Crowd {
 
   /* ------------------------------------------------------------ 配置 */
 
+  /** 里程 s の区間の種別。人出の多さを決めるのに使う。 */
+  _sectionKind(s) {
+    for (const sec of this.route.sections) {
+      if (s >= sec.from && s < sec.to) return sec.kind;
+    }
+    return this.route.sections.at(-1)?.kind ?? 'machiya';
+  }
+
   _spawnTownsfolk(rng) {
     const { route } = this;
+    // 町家の並ぶところと宿場は人が多く、武家地と在方の街道は少ない
+    const DENSITY = { machiya: [1, 3], shuku: [1, 3], yashiki: [0, 1], kaido: [0, 1] };
+
     for (let s = 40; s < route.length - 40; s += rng.range(7, 26)) {
-      // 江戸市中は人が多く、大木戸を出ると減る
-      const inCity = s < 5639;
-      const inShuku = s > 7379;
-      const count = inCity || inShuku ? rng.int(1, 3) : rng.int(0, 1);
+      const [lo, hi] = DENSITY[this._sectionKind(s)] ?? [0, 1];
+      const count = rng.int(lo, hi);
       const half = route.widthAt(s) / 2;
 
       for (let k = 0; k < count; k++) {
@@ -92,7 +96,7 @@ export class Crowd {
   }
 
   _spawnProcessions(rng) {
-    for (const spec of PROCESSIONS) {
+    for (const spec of this.route.processions) {
       const half = this.route.widthAt(spec.center) / 2;
       const members = [];
       const rows = Math.ceil(spec.members / 3);

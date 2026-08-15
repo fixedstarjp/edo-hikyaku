@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-08-15",
+  "routes": [
+    {
+      "id": "tokaido-01",
+      "road": "東海道",
+      "stage": 1,
+      "order": 1,
+      "name": "日本橋 → 品川宿",
+      "from": "日本橋",
+      "to": "品川宿",
+      "summary": "東海道五十七次の第一区間。江戸の大通りを南へ抜け、芝から先は左手に江戸湾を見ながら走る。",
+      "totalLength": 8166.5,
+      "historicalDistance": {
+        "ri": 2,
+        "km": 7.85,
+        "source": "東海道宿村大概帳ほか、日本橋〜品川宿 二里"
+      },
+      "stats": {
+        "minElevation": 1.63,
+        "maxElevation": 12.25,
+        "maxGradePermil": 52.7
+      }
+    },
+    {
+      "id": "koshu-01",
+      "road": "甲州道中",
+      "stage": 1,
+      "order": 2,
+      "name": "日本橋 → 内藤新宿",
+      "from": "日本橋",
+      "to": "内藤新宿",
+      "summary": "甲州道中の第一区間。神田から西へ折れ、九段坂を登って江戸城の堀端を抜け、麹町から四谷大木戸へ。台地を登り続ける道。",
+      "totalLength": 8075.1,
+      "historicalDistance": {
+        "ri": 2,
+        "km": 7.85,
+        "source": "日本橋〜内藤新宿 二里"
+      },
+      "stats": {
+        "minElevation": 2.97,
+        "maxElevation": 36.28,
+        "maxGradePermil": 89
+      }
+    }
+  ]
+}

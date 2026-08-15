@@ -45,9 +45,6 @@ export const STAMINA = {
   exhaustedUntil: 22,
 };
 
-/** 高輪大木戸は暮六つに閉じる。出立はその四半刻(30分)前。 */
-export const START_TIME_MINUTES = 17 * 60 + 30;
-
 export const CAMERA = {
   distance: 7.4,
   height: 3.0,

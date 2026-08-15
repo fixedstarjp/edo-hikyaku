@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>江戸飛脚 — 日本橋より品川宿へ</title>
+    <title>江戸飛脚</title>
   </head>
   <body>
     <canvas id="stage"></canvas>
@@ -17,7 +17,7 @@
         <div class="panel panel-progress">
           <div class="progress-head">
             <span id="next-landmark">日本橋</span>
-            <span id="remaining">残り 8.2 km</span>
+            <span id="remaining">残り —</span>
           </div>
           <div class="progress-track">
             <div class="progress-fill" id="progress-fill"></div>
@@ -25,7 +25,7 @@
           </div>
         </div>
         <div class="panel panel-deadline" id="deadline">
-          <div class="deadline-label">高輪大木戸 閉門まで</div>
+          <div class="deadline-label" id="deadline-label">閉門まで</div>
           <div class="deadline-value" id="deadline-value">—</div>
         </div>
       </div>
@@ -49,12 +49,23 @@
       </div>
     </div>
 
+    <div id="minimap" hidden>
+      <canvas id="minimap-canvas"></canvas>
+      <div class="minimap-foot">
+        <span id="minimap-label">—</span>
+        <span class="minimap-credit">地理院タイル</span>
+      </div>
+    </div>
+
     <div id="title-screen">
       <div class="title-inner">
-        <p class="title-kicker">東海道五十七次 · 第一区間</p>
+        <p class="title-kicker">五街道 · 第一区間</p>
         <h1>江戸飛脚</h1>
-        <p class="title-sub">日本橋 &mdash; 品川宿 &nbsp;二里</p>
+        <p class="title-sub">日本橋を発ち、江戸の境を抜ける</p>
+
+        <div class="stage-list" id="stage-list"></div>
         <p class="title-brief" id="title-brief">街道データを読み込んでいます…</p>
+
         <div class="title-keys">
           <div><kbd>W</kbd>/<kbd>↑</kbd> 走る</div>
           <div><kbd>Shift</kbd> 全力</div>
@@ -63,7 +74,7 @@
           <div><kbd>Space</kbd> 跳ぶ</div>
         </div>
         <button id="start-button" disabled>出立</button>
-        <p class="title-credit">標高: 国土地理院 標高タイル / 街道線形: 旧東海道の現況をデジタイズ</p>
+        <p class="title-credit">標高・地図: 国土地理院（標高タイル / 地理院タイル） · 街道線形: 旧街道の現況をデジタイズ</p>
       </div>
     </div>
 
@@ -72,7 +83,10 @@
         <h1 id="result-title">着</h1>
         <p class="result-sub" id="result-sub"></p>
         <table class="result-table" id="result-table"></table>
-        <button id="retry-button">もう一度走る</button>
+        <div class="result-buttons">
+          <button id="retry-button">もう一度走る</button>
+          <button id="back-button" class="ghost">街道を選ぶ</button>
+        </div>
       </div>
     </div>
 

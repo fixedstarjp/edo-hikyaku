@@ -13,6 +13,7 @@ export class Hud {
       progressFill: document.getElementById('progress-fill'),
       progressMarks: document.getElementById('progress-marks'),
       deadline: document.getElementById('deadline'),
+      deadlineLabel: document.getElementById('deadline-label'),
       deadlineValue: document.getElementById('deadline-value'),
       staminaFill: document.getElementById('stamina-fill'),
       speed: document.getElementById('speed'),
@@ -26,7 +27,10 @@ export class Hud {
 
     this._buildMarks();
     this._bannerTimer = null;
-    this._toasts = [];
+    this.gateLandmark = route.gateLandmark;
+    this.el.deadlineLabel.textContent = this.gateLandmark
+      ? `${this.gateLandmark.name} 閉門まで`
+      : '閉門まで';
   }
 
   show() {
@@ -38,6 +42,7 @@ export class Hud {
   }
 
   _buildMarks() {
+    this.el.progressMarks.replaceChildren();
     const frag = document.createDocumentFragment();
     for (const lm of this.route.landmarks) {
       const mark = document.createElement('span');
@@ -63,12 +68,11 @@ export class Hud {
       remain > 950 ? `残り ${(remain / 1000).toFixed(2)} km` : `残り ${Math.round(remain)} m`;
     el.progressFill.style.width = `${(player.s / route.length) * 100}%`;
 
-    const toDeadline = clock.minutesToKureMutsu;
-    const okido = route.landmarkByName('高輪大木戸');
-    if (okido && player.s < okido.s) {
+    const gate = this.gateLandmark;
+    if (gate && player.s < gate.s) {
+      const toDeadline = (route.gate.closesAtMinutes ?? 0) - clock.minutes;
       el.deadline.hidden = false;
-      const mins = Math.max(0, Math.ceil(toDeadline));
-      el.deadlineValue.textContent = toDeadline > 0 ? `${mins} 分` : '閉門';
+      el.deadlineValue.textContent = toDeadline > 0 ? `${Math.ceil(toDeadline)} 分` : '閉門';
       el.deadline.classList.toggle('urgent', toDeadline < 10);
       el.deadline.classList.toggle('closed', gateClosed);
     } else {
