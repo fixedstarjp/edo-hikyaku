@@ -274,7 +274,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 8px;
+  /* 幅が足りなければ出典を次の行へ落とす。出典は省けない。 */
+  flex-wrap: wrap;
+  gap: 2px 8px;
   padding: 4px 8px 5px;
   border-top: 1px solid rgba(232, 220, 195, 0.18);
   font-size: 11px;

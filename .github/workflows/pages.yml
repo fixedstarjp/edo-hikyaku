@@ -1,0 +1,53 @@
+name: GitHub Pages へ公開
+
+# main に入ったら建て直す。手で回すこともできる。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# deploy-pages が要求する権限。読み取りは既定のまま絞っておく。
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 公開は同時に一つだけ。走っている途中のものは止めない。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # 街道データ (src/data/*.generated.json) と小地図 (public/maps/*.png) は
+      # 生成済みのものを持たせてあるので、ここで国土地理院へ取りに行くことはない。
+      - name: 組み立て
+        run: npm run build
+        env:
+          # プロジェクトページの基準パス。リポジトリ名から作るので改名にも追随する。
+          PAGES_BASE: /${{ github.event.repository.name }}/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
