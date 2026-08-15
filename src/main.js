@@ -251,36 +251,53 @@ function backToTitle() {
 const camTarget = new THREE.Vector3();
 const camLook = new THREE.Vector3();
 const camDir = new THREE.Vector3();
+const _lookAside = new THREE.Vector3();
 const sm = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
 const UP = new THREE.Vector3(0, 1, 0);
 
-/** よそ見の向き。0 のとき進行方向。 */
-const look = { yaw: 0, pitch: 0 };
+/** よそ見の向き。0 のとき進行方向。実際の向きは目標へばねで追う。 */
+const look = { yaw: 0, pitch: 0, vYaw: 0, vPitch: 0, targetYaw: 0, targetPitch: 0 };
+
+/** 臨界減衰のばね。両端で速度が 0 になるので動き出しも止まりも柔らかい。 */
+function spring(value, velocity, target, dt) {
+  const k = LOOK.stiffness;
+  const c = 2 * Math.sqrt(k); // 臨界減衰
+  const v = velocity + (-k * (value - target) - c * velocity) * dt;
+  return [value + v * dt, v];
+}
 
 function updateLook(dtWall) {
+  const dt = Math.min(dtWall, 1 / 30); // 大きな dt でばねが暴れないように
   const max = THREE.MathUtils.degToRad(LOOK.maxYaw);
   const maxP = THREE.MathUtils.degToRad(LOOK.maxPitch);
 
   if (mouseLook.active) {
-    look.yaw = THREE.MathUtils.clamp(mouseLook.yaw, -max, max);
-    look.pitch = THREE.MathUtils.clamp(mouseLook.pitch, -maxP, maxP);
+    look.targetYaw = THREE.MathUtils.clamp(mouseLook.yaw, -max, max);
+    look.targetPitch = THREE.MathUtils.clamp(mouseLook.pitch, -maxP, maxP);
   } else {
     const key = (input.lookLeft ? 1 : 0) - (input.lookRight ? 1 : 0);
     if (key !== 0) {
-      look.yaw = THREE.MathUtils.clamp(
-        look.yaw + key * THREE.MathUtils.degToRad(LOOK.keySpeed) * dtWall, -max, max
+      look.targetYaw = THREE.MathUtils.clamp(
+        look.targetYaw + key * THREE.MathUtils.degToRad(LOOK.keySpeed) * dt, -max, max
       );
     } else {
       // 手を離したら正面へ戻る
-      const k = 1 - Math.exp(-LOOK.returnLag * dtWall);
-      look.yaw += (0 - look.yaw) * k;
-      look.pitch += (0 - look.pitch) * k;
+      look.targetYaw = 0;
+      look.targetPitch = 0;
     }
   }
+
+  [look.yaw, look.vYaw] = spring(look.yaw, look.vYaw, look.targetYaw, dt);
+  [look.pitch, look.vPitch] = spring(look.pitch, look.vPitch, look.targetPitch, dt);
 }
 
-function isLookingAway() {
-  return Math.abs(look.yaw) > 0.18;
+/**
+ * よそ見の度合い 0..1。
+ * 追従の速さ・霞の距離・見る先をこれで連続に混ぜる。
+ * 閾値で切り替えると、前を向き直る瞬間に画がぱたりと切り替わってしまう。
+ */
+function lookAwayAmount() {
+  return THREE.MathUtils.smoothstep(Math.abs(look.yaw), 0.05, 0.55);
 }
 
 function placeCamera(snap) {
@@ -296,15 +313,20 @@ function placeCamera(snap) {
   camTarget.addScaledVector(camDir, -CAMERA.distance);
   if (snap) camera.position.copy(camTarget);
 
-  if (Math.abs(look.yaw) < 1e-3) {
-    // 正面を向いているときは街道の先を見る。カーブで内側が見えるように。
-    const ahead = player.s + CAMERA.lookAhead;
-    route.sample(ahead, player.u * 0.35, sm);
-    camLook.set(sm.pos.x, sm.pos.y + landmarks.liftAt(ahead) + CAMERA.lookHeight, sm.pos.z);
-  } else {
+  // 正面のときは街道の先（カーブの内側が見える）、よそ見のときは首の向いた先。
+  // 二つを連続に混ぜて、向き直る瞬間に画が飛ばないようにする。
+  const away = lookAwayAmount();
+  const ahead = player.s + CAMERA.lookAhead;
+  route.sample(ahead, player.u * 0.35, sm);
+  camLook.set(sm.pos.x, sm.pos.y + landmarks.liftAt(ahead) + CAMERA.lookHeight, sm.pos.z);
+
+  if (away > 0) {
     route.sample(player.s, player.u * 0.5, sm);
-    camLook.set(sm.pos.x, focusY, sm.pos.z).addScaledVector(camDir, CAMERA.lookAhead);
-    camLook.y += Math.tan(look.pitch) * CAMERA.lookAhead;
+    _lookAside
+      .set(sm.pos.x, focusY, sm.pos.z)
+      .addScaledVector(camDir, CAMERA.lookAhead);
+    _lookAside.y += Math.tan(look.pitch) * CAMERA.lookAhead;
+    camLook.lerp(_lookAside, away);
   }
   camera.lookAt(camLook);
 }
@@ -383,14 +405,16 @@ function step(dtWall) {
   updateLook(dtWall);
   placeCamera(false);
   // よそ見のあいだは追従を速くして、首を振った先がすぐ見えるようにする
-  camera.position.lerp(camTarget, 1 - Math.exp(-(isLookingAway() ? 12 : CAMERA.lag) * dtWall));
+  const away = lookAwayAmount();
+  const lag = CAMERA.lag + (11 - CAMERA.lag) * away;
+  camera.position.lerp(camTarget, 1 - Math.exp(-lag * dtWall));
 
-  const targetFov = CAMERA.fov + (player.speed > SPEED.run * 1.05 && !isLookingAway() ? 5 : 0);
+  const targetFov = CAMERA.fov + (player.speed > SPEED.run * 1.05 ? 5 : 0) * (1 - away);
   camera.fov += (targetFov - camera.fov) * Math.min(1, dtWall * 4);
   camera.updateProjectionMatrix();
 
   // 横を向いたら霞を払う。海や城を遠くまで見せるため。
-  const wantFar = isLookingAway() ? LOOK.fogFarLookaway : FOG.far;
+  const wantFar = FOG.far + (LOOK.fogFarLookaway - FOG.far) * away;
   scene.fog.far += (wantFar - scene.fog.far) * Math.min(1, dtWall * 2.5);
 
   sky.update(clock, camera.position);

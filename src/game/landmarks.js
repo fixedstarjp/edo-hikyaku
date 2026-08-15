@@ -42,6 +42,7 @@ export class Landmarks {
       if (lm.bridge) this._bridge(lm);
       if (lm.gateway) this._gateway(lm);
       if (lm.moat) this._moat(lm);
+      if (lm.keep) this._keep(lm);
 
       switch (lm.kind) {
         case 'kosatsu':
@@ -281,9 +282,16 @@ export class Landmarks {
       order({ u: toeU, y: roadY + 0.4 }, { u: stoneTop, y: roadY + wallH }),
       materials.ishigaki
     );
-    // 石垣の背後は森。北の丸は堀端より一段高い。
+    // 石垣の背後は森。北の丸は堀端よりわずかに高いだけで、
+    // ここを高く盛りすぎると奥の天守が土手に隠れてしまう。
+    const inner = 6;
     this._ribbon(s0, s1, (s, roadY) =>
-      order({ u: stoneTop, y: roadY + wallH }, { u: backTop, y: roadY + wallH + 16 }),
+      order({ u: stoneTop, y: roadY + wallH }, { u: backTop, y: roadY + wallH + inner }),
+      materials.turf
+    );
+    // 城内はそのまま奥へ続く。天守を載せる地面でもある。
+    this._ribbon(s0, s1, (s, roadY) =>
+      order({ u: backTop, y: roadY + wallH + inner }, { u: outer + side * 900, y: roadY + wallH + inner }),
       materials.turf
     );
 
@@ -331,18 +339,80 @@ export class Landmarks {
     const rng = makeRng(1657);
     for (let k = 0; k < pines; k++) {
       const s = rng.range(s0, s1);
-      const d = rng.range(10, 80);
+      // 木は堀端に寄せ、丈も抑える。奥の天守を隠さないため。
+      const d = rng.range(8, 55);
       const at = this._at(s, stoneTop + side * d);
       // 背後の森は土手の傾きに乗せる
-      const rise = wallH + (16 * d) / 95;
-      const h = rng.range(9, 16);
+      const rise = wallH + (inner * Math.min(d, 95)) / 95;
+      const h = rng.range(7, 11);
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.5, h, 6), materials.wood);
       trunk.position.copy(at.pos).setY(at.pos.y + rise + h / 2);
       this.group.add(trunk);
-      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(rng.range(4.2, 7), 1), materials.tree);
+      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(rng.range(3.4, 5.4), 1), materials.tree);
       crown.position.copy(at.pos).setY(at.pos.y + rise + h * 0.92);
       crown.scale.y = 0.6;
       this.group.add(crown);
+    }
+  }
+
+  /* ---------------------------------------------------------- 天守 */
+
+  /**
+   * 天守。層塔型五重の櫓を石垣の上に載せる。
+   *
+   * 寛永十五年(1638)に家光が建てた天守は五層、天守台込みで約 58m あり、
+   * 日本で建てられた最大の天守だった。明暦三年(1657)の大火で焼け落ち、
+   * 天守台だけが再建されて、天守そのものは幕末まで建て直されていない。
+   * つまりこの区間の時代（元禄以降）には本来存在しない。
+   * それを承知で建てているので、名所の説明にその旨を明記すること。
+   */
+  _keep(lm) {
+    const { materials } = this;
+    const {
+      side, distanceM, alongM = 0, baseLiftM = 0,
+      baseM = 13, heightM = 45, tiers = 5, baseWidthM = 30,
+    } = lm.keep;
+
+    const at = this._at(lm.s + alongM, side * distanceM);
+    const groundY = at.pos.y + baseLiftM;
+    const yaw = at.yaw;
+    const place = (mesh, y) => {
+      mesh.position.copy(at.pos).setY(y);
+      mesh.rotation.y = yaw + Math.PI / 4; // 四角柱の面を街道へ向ける
+      this.group.add(mesh);
+    };
+
+    // 天守台。上へすぼまる石垣。
+    const R = baseWidthM / Math.SQRT2;
+    const podium = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.87, R, baseM, 4), materials.ishigaki);
+    place(podium, groundY + baseM / 2);
+
+    // 五重。上へ行くほど小さくなり、各重に瓦屋根が付く。
+    let y = groundY + baseM;
+    let w = baseWidthM * 0.73;
+    const each = heightM / tiers;
+    for (let i = 0; i < tiers; i++) {
+      const h = each * (1.18 - i * 0.09);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(w, h * 0.72, w), materials.plaster);
+      place(body, y + h * 0.36);
+
+      const roof = new THREE.Mesh(roofPrism(), materials.kawara);
+      roof.scale.set(w * 1.34, h * 0.32, w * 1.34);
+      place(roof, y + h * 0.72);
+
+      if (i === tiers - 1) {
+        // 鯱。棟の両端に。
+        for (const dx of [-w * 0.5, w * 0.5]) {
+          const shachi = new THREE.Mesh(new THREE.ConeGeometry(w * 0.05, w * 0.16, 5), materials.brass);
+          shachi.position.copy(at.pos).setY(y + h * 1.04);
+          shachi.position.x += Math.cos(yaw + Math.PI / 4) * dx;
+          shachi.position.z -= Math.sin(yaw + Math.PI / 4) * dx;
+          this.group.add(shachi);
+        }
+      }
+
+      y += h;
+      w *= 0.83;
     }
   }
 

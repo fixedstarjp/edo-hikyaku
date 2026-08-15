@@ -70,10 +70,15 @@ export const LOOK = {
   /** マウス 1px あたりの角度 (度) */
   mouseYaw: 0.28,
   mousePitch: 0.2,
-  /** 手を離してから戻る速さ */
-  returnLag: 3.2,
+  /**
+   * 首の動きのばね定数。臨界減衰させるので、振り始めと戻り終わりで
+   * 速度が 0 になる。指数減衰だと「最初だけ速くて後は這う」戻り方になり、
+   * 前を向き直る瞬間が急に感じられる。
+   * 収まるまでおよそ 4/√k 秒。
+   */
+  stiffness: 13,
   /** 横を向いているあいだは霞を遠くまで払う */
-  fogFarLookaway: 900,
+  fogFarLookaway: 1300,
 };
 
 export const FOG = { near: 40, far: 340 };

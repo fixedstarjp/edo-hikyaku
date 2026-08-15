@@ -110,8 +110,8 @@ export class Hud {
       setTimeout(() => {
         el.banner.hidden = true;
       }, 600);
-      // 名所が増えたので、読み切れる長さは確保しつつ次に譲る
-    }, 6500);
+      // 説明が長いものもあるので、読み切れるだけ出しておく
+    }, 10000);
   }
 
   toast(text, { strong = false } = {}) {
