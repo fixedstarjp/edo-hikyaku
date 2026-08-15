@@ -29,9 +29,24 @@ export class Hud {
     this._buildMarks();
     this._bannerTimer = null;
     this.gateLandmark = route.gateLandmark;
-    this.el.deadlineLabel.textContent = this.gateLandmark
-      ? `${this.gateLandmark.name} 閉門まで`
-      : '閉門まで';
+
+    // 大木戸のある街道は閉門、無い街道は問屋場への継立の刻限。
+    // 幅の狭い画面では名前を落とさないと小地図とぶつかる。
+    const kind = route.gate?.kind === 'keijitsu' ? '刻限' : '閉門';
+    this._narrow = matchMedia('(max-width: 560px)');
+    this._setDeadlineLabel = () => {
+      this.el.deadlineLabel.textContent =
+        this.gateLandmark && !this._narrow.matches
+          ? `${this.gateLandmark.name} ${kind}まで`
+          : `${kind}まで`;
+    };
+    this._setDeadlineLabel();
+    this._narrow.addEventListener('change', this._setDeadlineLabel);
+  }
+
+  destroy() {
+    this._narrow.removeEventListener('change', this._setDeadlineLabel);
+    clearTimeout(this._bannerTimer);
   }
 
   show() {

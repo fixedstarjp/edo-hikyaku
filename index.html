@@ -2,7 +2,12 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1"
+    />
+    <meta name="theme-color" content="#101a2b" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>江戸飛脚</title>
   </head>
   <body>
@@ -52,6 +57,17 @@
       </div>
     </div>
 
+    <div id="touch" hidden>
+      <div id="touch-pad">
+        <div id="touch-knob"></div>
+        <span class="touch-hint">避ける<br />↓緩める</span>
+      </div>
+      <div class="touch-buttons">
+        <button id="touch-sprint" class="touch-btn">全力</button>
+        <button id="touch-jump" class="touch-btn">跳</button>
+      </div>
+    </div>
+
     <div id="minimap" hidden>
       <canvas id="minimap-canvas"></canvas>
       <div class="minimap-foot">
@@ -65,12 +81,14 @@
         <p class="title-kicker">五街道 · 第一区間</p>
         <h1>江戸飛脚</h1>
         <p class="title-sub">日本橋を発ち、江戸の境を抜ける</p>
-        <p class="title-hint">横を向けば海や城が見える。<kbd>Q</kbd><kbd>E</kbd> か右ドラッグ。</p>
+        <p class="title-hint" id="title-hint">
+          横を向けば海や城が見える。<kbd>Q</kbd><kbd>E</kbd> か右ドラッグ。
+        </p>
 
         <div class="stage-list" id="stage-list"></div>
         <p class="title-brief" id="title-brief">街道データを読み込んでいます…</p>
 
-        <div class="title-keys">
+        <div class="title-keys" id="title-keys">
           <div><kbd>W</kbd>/<kbd>↑</kbd> 走る</div>
           <div><kbd>Shift</kbd> 全力</div>
           <div><kbd>S</kbd>/<kbd>↓</kbd> 緩める</div>
@@ -78,8 +96,14 @@
           <div><kbd>Space</kbd> 跳ぶ</div>
           <div><kbd>Q</kbd><kbd>E</kbd>／右ドラッグ よそ見</div>
         </div>
+        <div class="title-keys touch-keys" id="title-keys-touch" hidden>
+          <div>飛脚はひとりでに走る</div>
+          <div>左下の輪 — 横へ引いて避ける／下へ引いて緩める</div>
+          <div>右下 — 全力（押しっぱなし）と跳ぶ</div>
+          <div>画面をなぞる — よそ見。離せば前を向く</div>
+        </div>
         <button id="start-button" disabled>出立</button>
-        <p class="title-credit">標高・地図: 国土地理院（標高タイル / 地理院タイル） · 街道線形: 旧街道の現況をデジタイズ</p>
+        <p class="title-credit">標高・地図: 国土地理院（標高タイル / 地理院タイル）</p>
       </div>
     </div>
 

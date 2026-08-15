@@ -20,12 +20,20 @@ body {
   background: #0d1420;
   color: var(--kinari);
   font-family: var(--gothic);
+  /* 引っ張って再読込・つまんで拡大を止める */
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #stage {
   display: block;
   width: 100vw;
-  height: 100vh;
+  /* 携帯では住所欄の出入りで 100vh が動くので dvh を使う */
+  height: 100dvh;
+  touch-action: none;
 }
 
 /* ---------------------------------------------------------------- HUD */
@@ -34,7 +42,8 @@ body {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  padding: 18px 22px;
+  padding: max(18px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -402,8 +411,12 @@ body {
 #result-screen {
   position: fixed;
   inset: 0;
-  display: grid;
-  place-items: center;
+  /* 中身が画面より高いときは上を切らずに巻き取れるようにする。
+     flex + margin:auto なら、収まるときは中央、溢れるときは頭から出る。 */
+  display: flex;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   background:
     radial-gradient(ellipse at 50% 38%, rgba(38, 60, 96, 0.5), transparent 62%),
     linear-gradient(180deg, #101a2b 0%, #1b2233 55%, #2a2620 100%);
@@ -416,9 +429,10 @@ body {
 }
 
 .title-inner {
+  margin: auto;
   text-align: center;
   max-width: 560px;
-  padding: 30px;
+  padding: 14px 30px;
 }
 
 .title-kicker {
@@ -427,12 +441,12 @@ body {
   letter-spacing: 0.4em;
   text-indent: 0.4em;
   opacity: 0.65;
-  margin: 0 0 10px;
+  margin: 0 0 6px;
 }
 
 .title-inner h1 {
   font-family: var(--mincho);
-  font-size: 74px;
+  font-size: 46px;
   letter-spacing: 0.24em;
   text-indent: 0.24em;
   margin: 0;
@@ -441,32 +455,32 @@ body {
 
 .title-sub {
   font-family: var(--mincho);
-  font-size: 18px;
+  font-size: 17px;
   letter-spacing: 0.16em;
   opacity: 0.85;
-  margin: 6px 0 26px;
+  margin: 4px 0 12px;
 }
 
 .title-hint {
   font-size: 12px;
   opacity: 0.6;
   letter-spacing: 0.03em;
-  margin: -14px 0 22px;
+  margin: -10px 0 16px;
 }
 
 .stage-list {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 22px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .stage-card {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   align-content: start;
   text-align: left;
-  padding: 12px 16px;
+  padding: 9px 15px;
   font-family: var(--gothic);
   font-size: 13px;
   letter-spacing: 0.03em;
@@ -521,10 +535,10 @@ button.ghost {
 
 .title-brief {
   font-size: 13px;
-  line-height: 2;
+  line-height: 1.75;
   letter-spacing: 0.03em;
   opacity: 0.8;
-  margin: 0 0 24px;
+  margin: 0 0 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -537,10 +551,10 @@ button.ghost {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px 16px;
+  gap: 6px 14px;
   font-size: 12px;
   opacity: 0.75;
-  margin-bottom: 28px;
+  margin-bottom: 14px;
 }
 
 kbd {
@@ -579,10 +593,107 @@ button:disabled {
 }
 
 .title-credit {
-  margin: 26px 0 0;
+  margin: 12px 0 0;
   font-size: 10.5px;
   opacity: 0.42;
   letter-spacing: 0.03em;
+}
+
+/* --------------------------------------------------------- 触れる操作 */
+
+#touch {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 6;
+  pointer-events: none;
+  padding: 0 max(18px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-right));
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+#touch[hidden] {
+  display: none;
+}
+
+#touch-pad,
+.touch-btn {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+#touch-pad {
+  position: relative;
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  border: 1px solid rgba(232, 220, 195, 0.3);
+  background: rgba(20, 17, 14, 0.4);
+  display: grid;
+  place-items: center;
+}
+
+#touch-pad.slow {
+  border-color: rgba(240, 168, 119, 0.8);
+}
+
+#touch-knob {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(239, 228, 203, 0.34);
+  border: 1px solid rgba(239, 228, 203, 0.5);
+}
+
+.touch-hint {
+  position: absolute;
+  bottom: -30px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.4;
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.touch-buttons {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.touch-btn {
+  width: 78px;
+  height: 78px;
+  padding: 0;
+  border-radius: 50%;
+  font-family: var(--mincho);
+  font-size: 19px;
+  letter-spacing: 0.08em;
+  text-indent: 0.08em;
+  border: 1px solid rgba(232, 220, 195, 0.34);
+  background: rgba(20, 17, 14, 0.44);
+}
+
+#touch-jump {
+  width: 92px;
+  height: 92px;
+  font-size: 23px;
+}
+
+.touch-btn.on {
+  background: rgba(184, 146, 90, 0.42);
+  border-color: var(--kinari);
+}
+
+.touch-keys {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 
 /* --------------------------------------------------------- 結果画面 */
@@ -627,4 +738,407 @@ button:disabled {
 .result-table td {
   text-align: right;
   color: #f0d9a8;
+}
+
+/* ============================================================ 携帯 */
+
+/* 幅の狭い画面。横持ちの携帯もここに入る。 */
+@media (max-width: 900px) {
+  #hud {
+    padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+      max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+
+  .hud-top {
+    gap: 8px;
+    padding-right: 150px; /* 小地図のぶん */
+  }
+
+  .panel {
+    padding: 5px 9px;
+  }
+
+  .panel-koku {
+    min-width: 74px;
+  }
+
+  .koku {
+    font-size: 18px;
+  }
+
+  .clock {
+    font-size: 9.5px;
+  }
+
+  .progress-head {
+    font-size: 10.5px;
+    margin-bottom: 5px;
+  }
+
+  .progress-head span:first-child {
+    font-size: 12px;
+  }
+
+  .panel-deadline {
+    min-width: 96px;
+  }
+
+  .deadline-label {
+    font-size: 9.5px;
+  }
+
+  .deadline-value {
+    font-size: 16px;
+  }
+
+  #minimap {
+    top: max(10px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    width: 136px;
+  }
+
+  #minimap-label {
+    font-size: 11px;
+  }
+
+  .minimap-credit {
+    font-size: 8px;
+  }
+
+  /* 息と数値は操作盤の上に重ならないよう天井近くへ寄せ、
+     右端は小地図の手前で止める。 */
+  .hud-bottom {
+    position: absolute;
+    left: max(12px, env(safe-area-inset-left));
+    right: calc(max(12px, env(safe-area-inset-right)) + 138px);
+    top: 74px;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .gauge {
+    width: 170px;
+    padding: 5px 9px;
+    gap: 7px;
+  }
+
+  .gauge-label {
+    font-size: 13px;
+  }
+
+  .readout {
+    gap: 9px;
+    font-size: 10.5px;
+    padding: 5px 9px;
+  }
+
+  #banner {
+    left: max(12px, env(safe-area-inset-left));
+    bottom: 168px;
+    width: 300px;
+    max-width: calc(100vw - 210px);
+    padding: 9px 13px 11px;
+  }
+
+  .banner-name {
+    font-size: 19px;
+  }
+
+  .banner-kana {
+    font-size: 9.5px;
+  }
+
+  .banner-note {
+    font-size: 11.5px;
+    line-height: 1.75;
+  }
+
+  #toast {
+    bottom: 130px;
+  }
+
+  .toast {
+    font-size: 11.5px;
+    padding: 5px 12px;
+  }
+
+  .toast.strong {
+    font-size: 14px;
+  }
+
+  .title-inner {
+    padding: 20px 18px;
+    max-width: 100%;
+  }
+
+  .title-inner h1 {
+    font-size: 46px;
+  }
+
+  .title-kicker {
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+
+  .title-sub {
+    font-size: 14px;
+    margin: 4px 0 14px;
+  }
+
+  .title-hint {
+    margin: -8px 0 14px;
+  }
+
+  .stage-list {
+    gap: 7px;
+    margin-bottom: 14px;
+  }
+
+  .stage-card {
+    padding: 9px 12px;
+  }
+
+  .stage-road {
+    font-size: 14px;
+  }
+
+  .stage-name {
+    font-size: 11px;
+  }
+
+  .stage-figures {
+    font-size: 9.5px;
+  }
+
+  .title-brief {
+    font-size: 11.5px;
+    line-height: 1.75;
+    margin-bottom: 14px;
+  }
+
+  .title-keys {
+    font-size: 10.5px;
+    margin-bottom: 16px;
+  }
+
+  button {
+    font-size: 17px;
+    padding: 9px 32px;
+  }
+
+  #result-title {
+    font-size: 38px;
+  }
+
+  .result-table {
+    font-size: 11.5px;
+    margin-bottom: 18px;
+  }
+
+  .result-table th,
+  .result-table td {
+    padding: 6px 3px;
+  }
+
+  .title-credit {
+    font-size: 9px;
+  }
+}
+
+/* 縦持ち。横幅がないので札と操作盤を縦に積む。 */
+@media (max-width: 560px) {
+  /* 上段は小地図の左に収める。進捗だけ下の段へ回す。 */
+  .hud-top {
+    flex-wrap: wrap;
+    padding-right: 126px;
+  }
+
+  .panel-progress {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .panel-koku {
+    min-width: 62px;
+  }
+
+  .koku {
+    font-size: 16px;
+  }
+
+  .panel-deadline {
+    min-width: 84px;
+  }
+
+  .deadline-value {
+    font-size: 15px;
+  }
+
+  #minimap {
+    width: 116px;
+  }
+
+  .hud-bottom {
+    top: 128px;
+    right: max(12px, env(safe-area-inset-right));
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  #banner {
+    right: max(12px, env(safe-area-inset-right));
+    width: auto;
+    max-width: none;
+    bottom: 184px;
+  }
+
+  /* 縦持ちの携帯でも巻き取らずに「出立」まで見えるよう、
+     一画面に収まるところまで詰める。 */
+  .stage-list {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+
+  .stage-card {
+    padding: 6px 12px;
+    gap: 1px;
+  }
+
+  .stage-road {
+    font-size: 13px;
+  }
+
+  .title-inner {
+    padding: 16px 18px;
+  }
+
+  .title-inner h1 {
+    font-size: 32px;
+  }
+
+  .title-sub {
+    margin: 2px 0 10px;
+  }
+
+  .title-hint {
+    display: none;
+  }
+
+  .title-brief {
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+
+  .title-keys {
+    gap: 3px;
+    font-size: 10px;
+    margin-bottom: 12px;
+  }
+
+  .title-credit {
+    margin-top: 14px;
+  }
+
+  #touch-pad {
+    width: 104px;
+    height: 104px;
+  }
+
+  .touch-btn {
+    width: 68px;
+    height: 68px;
+    font-size: 17px;
+  }
+
+  #touch-jump {
+    width: 80px;
+    height: 80px;
+    font-size: 20px;
+  }
+}
+
+/* 横持ちの携帯。縦に余裕が無いので、札と報せを空いている場所へ回す。 */
+@media (max-width: 900px) and (orientation: landscape) {
+  /* 名所の札は左下の輪と右下の釦のあいだ、真ん中の空きへ */
+  #banner {
+    left: calc(max(18px, env(safe-area-inset-left)) + 142px);
+    right: auto;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: min(370px, calc(100vw - 340px));
+    max-width: none;
+  }
+
+  /* 報せは画のなかへ。すぐ消えるので邪魔にならない。 */
+  #toast {
+    bottom: auto;
+    top: 118px;
+  }
+}
+
+/* 背が低いとき。文字を詰めて巻き取る量を減らす。 */
+@media (max-height: 520px) {
+  .title-inner {
+    padding: 12px 18px;
+  }
+
+  .title-kicker,
+  .title-hint {
+    display: none;
+  }
+
+  .title-inner h1 {
+    font-size: 30px;
+  }
+
+  .title-sub {
+    font-size: 12px;
+    margin: 2px 0 8px;
+  }
+
+  .stage-list {
+    gap: 6px;
+    margin-bottom: 9px;
+  }
+
+  .stage-card {
+    padding: 6px 12px;
+    gap: 1px;
+  }
+
+  .title-brief {
+    font-size: 11px;
+    line-height: 1.55;
+    margin-bottom: 8px;
+  }
+
+  .title-keys {
+    gap: 2px;
+    font-size: 10px;
+    margin-bottom: 10px;
+  }
+
+  button {
+    font-size: 15px;
+    padding: 7px 26px;
+  }
+
+  #result-title {
+    font-size: 30px;
+  }
+
+  .result-sub {
+    margin-bottom: 12px;
+  }
+
+  .result-table {
+    margin-bottom: 12px;
+  }
+
+  .title-credit {
+    margin-top: 8px;
+    font-size: 8.5px;
+  }
 }

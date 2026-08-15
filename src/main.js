@@ -13,12 +13,24 @@ import { Minimap } from './game/minimap.js';
 import { EdoClock } from './game/time.js';
 import { Sky } from './game/sky.js';
 import { Distance } from './game/distance.js';
+import { TouchControls, isCoarsePointer } from './game/touch.js';
 
 import manifest from './data/routes.generated.json';
 
+/**
+ * 触れて操る端末かどうか。
+ * 携帯では鍵盤が無いので操作を差し替え、描画も控えめにする。
+ */
+const COARSE = isCoarsePointer();
+
 const canvas = document.getElementById('stage');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  // 携帯は画素密度が高いので、多重標本化まで掛けると割に合わない
+  antialias: !COARSE,
+  powerPreference: 'high-performance',
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, COARSE ? 1.75 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -120,6 +132,7 @@ function disposeStage() {
   stage.minimap?.hide();
   stage.minimap?.destroy();
   stage.hud.hide();
+  stage.hud.destroy();
   for (const g of stage.groups) {
     scene.remove(g);
     g.traverse((o) => {
@@ -146,27 +159,42 @@ const KEYS = {
   KeyF: 'fast',
 };
 
-/** 右ボタンを押しているあいだ、マウスで首を回す。 */
-const mouseLook = { active: false, yaw: 0, pitch: 0 };
+/** よそ見の引き量。マウスの右ドラッグと画面のなぞりで共用する。 */
+const dragLook = { active: false, yaw: 0, pitch: 0 };
 
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-canvas.addEventListener('pointerdown', (e) => {
-  if (e.button !== 2) return;
-  mouseLook.active = true;
-  mouseLook.yaw = look.yaw;
-  mouseLook.pitch = look.pitch;
-  canvas.setPointerCapture(e.pointerId);
-});
-canvas.addEventListener('pointermove', (e) => {
-  if (!mouseLook.active) return;
-  mouseLook.yaw -= THREE.MathUtils.degToRad(e.movementX * LOOK.mouseYaw);
-  mouseLook.pitch -= THREE.MathUtils.degToRad(e.movementY * LOOK.mousePitch);
-});
-const releaseLook = () => {
-  mouseLook.active = false;
-};
-canvas.addEventListener('pointerup', releaseLook);
-canvas.addEventListener('pointercancel', releaseLook);
+if (!COARSE) {
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== 2) return;
+    dragLook.active = true;
+    dragLook.yaw = look.yaw;
+    dragLook.pitch = look.pitch;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragLook.active) return;
+    dragLook.yaw -= THREE.MathUtils.degToRad(e.movementX * LOOK.mouseYaw);
+    dragLook.pitch -= THREE.MathUtils.degToRad(e.movementY * LOOK.mousePitch);
+  });
+  const releaseLook = () => {
+    dragLook.active = false;
+  };
+  canvas.addEventListener('pointerup', releaseLook);
+  canvas.addEventListener('pointercancel', releaseLook);
+}
+
+/** 携帯の操作盤。触れる端末のときだけ現れる。 */
+const touch = COARSE
+  ? new TouchControls(
+      input,
+      dragLook,
+      {
+        yaw: THREE.MathUtils.degToRad(LOOK.touchYaw),
+        pitch: THREE.MathUtils.degToRad(LOOK.touchPitch),
+      },
+      () => look
+    )
+  : null;
 
 addEventListener('keydown', (e) => {
   if (e.code === 'Space') {
@@ -196,7 +224,8 @@ addEventListener('keyup', (e) => {
 
 addEventListener('blur', () => {
   for (const k of Object.keys(input)) input[k] = false;
-  mouseLook.active = false;
+  dragLook.active = false;
+  touch?.reset();
 });
 
 addEventListener('resize', () => {
@@ -224,6 +253,8 @@ function startRun() {
   document.getElementById('result-screen').hidden = true;
   st.hud.show();
   st.minimap?.show();
+  touch?.reset();
+  if (touch) document.getElementById('touch').hidden = false;
   placeCamera(true);
   st.hud.banner(st.route.landmarks[0]);
 }
@@ -233,7 +264,14 @@ function finish(kind) {
   stage.finishedAt = stage.clock.minutes;
   stage.hud.hide();
   stage.minimap?.hide();
+  hideTouch();
   showResult(kind);
+}
+
+function hideTouch() {
+  if (!touch) return;
+  touch.reset();
+  document.getElementById('touch').hidden = true;
 }
 
 function backToTitle() {
@@ -241,6 +279,7 @@ function backToTitle() {
     stage.phase = 'idle';
     stage.hud.hide();
     stage.minimap?.hide();
+    hideTouch();
   }
   document.getElementById('result-screen').hidden = true;
   document.getElementById('title-screen').hidden = false;
@@ -271,9 +310,9 @@ function updateLook(dtWall) {
   const max = THREE.MathUtils.degToRad(LOOK.maxYaw);
   const maxP = THREE.MathUtils.degToRad(LOOK.maxPitch);
 
-  if (mouseLook.active) {
-    look.targetYaw = THREE.MathUtils.clamp(mouseLook.yaw, -max, max);
-    look.targetPitch = THREE.MathUtils.clamp(mouseLook.pitch, -maxP, maxP);
+  if (dragLook.active) {
+    look.targetYaw = THREE.MathUtils.clamp(dragLook.yaw, -max, max);
+    look.targetPitch = THREE.MathUtils.clamp(dragLook.pitch, -maxP, maxP);
   } else {
     const key = (input.lookLeft ? 1 : 0) - (input.lookRight ? 1 : 0);
     if (key !== 0) {
@@ -418,9 +457,19 @@ function step(dtWall) {
   scene.fog.far += (wantFar - scene.fog.far) * Math.min(1, dtWall * 2.5);
 
   sky.update(clock, camera.position);
-  hud.update({ player, clock, gateClosed });
-  minimap?.update(player);
+
+  // HUD は DOM の書き換えなので毎コマは要らない。数値の動きは遅い。
+  hudTimer -= dtWall;
+  if (hudTimer <= 0) {
+    hudTimer = HUD_INTERVAL;
+    hud.update({ player, clock, gateClosed });
+    minimap?.update(player);
+  }
 }
+
+/** HUD を書き換える間隔 (秒)。 */
+const HUD_INTERVAL = 1 / 15;
+let hudTimer = 0;
 
 /* ------------------------------------------------------------ 画面 */
 
@@ -517,6 +566,12 @@ document.getElementById('back-button').addEventListener('click', backToTitle);
 /* ------------------------------------------------------------ 起動 */
 
 async function boot() {
+  if (COARSE) {
+    document.getElementById('title-keys').hidden = true;
+    document.getElementById('title-keys-touch').hidden = false;
+    document.getElementById('title-hint').textContent =
+      '画面をなぞれば横を向ける。海や城が見える。';
+  }
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}maps/index.json`);
     if (res.ok) mapIndex = await res.json();
@@ -536,7 +591,7 @@ boot();
  *   __hikyaku.tick(1/60, 600) 描画が止まっている環境で手回しする
  */
 window.__hikyaku = {
-  THREE, renderer, scene, camera, sky, manifest,
+  THREE, renderer, scene, camera, sky, manifest, input, look, touch, coarse: COARSE,
   get stage() { return stage; },
   get route() { return stage.route; },
   get player() { return stage.player; },

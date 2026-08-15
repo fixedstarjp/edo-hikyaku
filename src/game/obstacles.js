@@ -14,6 +14,13 @@ import { instanced } from './townscape.js';
 
 const TOWNSFOLK_COLORS = [0x5b6b7a, 0x7a6a58, 0x4f5b4a, 0x8a7a63, 0x6a5566, 0x3f4a5c, 0x8f6f56];
 
+/* 毎コマ回す処理で使い回す入れ物。 */
+const _m = new THREE.Matrix4();
+const _q = new THREE.Quaternion();
+const _up = new THREE.Vector3(0, 1, 0);
+const _one = new THREE.Vector3(1, 1, 1);
+const _sample = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
+
 
 export class Crowd {
   constructor(route, materials) {
@@ -41,7 +48,9 @@ export class Crowd {
       p.center = p.baseCenter;
       p.scolded = false;
       p.warned = false;
+      this._writeProcession(p);
     }
+    this.procMesh.instanceMatrix.needsUpdate = true;
   }
 
   /* ------------------------------------------------------------ 配置 */
@@ -161,6 +170,10 @@ export class Crowd {
     }
     if (this.procMesh.instanceColor) this.procMesh.instanceColor.needsUpdate = true;
     this.procMesh.count = total;
+
+    // 初期位置を一度だけ書いておく。以後は近づいたときだけ書き直す。
+    for (const p of this.processions) this._writeProcession(p);
+    this.procMesh.instanceMatrix.needsUpdate = true;
   }
 
   _itemFor(o) {
@@ -175,27 +188,33 @@ export class Crowd {
 
   /* ------------------------------------------------------------ 更新 */
 
+  /**
+   * 行列の一人ひとりを今の中心位置に並べ直す。
+   * 毎コマ三十人分を回すので、行列も四元数もサンプルの受け皿も使い回す。
+   * route.sample は受け皿を渡さないと毎回 Vector3 を三つ作ってしまう。
+   */
+  _writeProcession(p) {
+    for (const mem of p.members) {
+      const sm = this.route.sample(p.center + mem.ds, mem.du, _sample);
+      _q.setFromAxisAngle(_up, Math.atan2(-sm.tangent.z, sm.tangent.x) + Math.PI);
+      _m.compose(sm.pos, _q, _one);
+      this.procMesh.setMatrixAt(mem.index, _m);
+    }
+  }
+
   update(dtGame, player, nowMinutes) {
     const events = [];
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const up = new THREE.Vector3(0, 1, 0);
-    const scale = new THREE.Vector3(1, 1, 1);
 
+    // 遠い行列は動かさないし、行列も書き換えない。
+    // 位置は最後に書いたままで正しいので、近づいてから書き直せば足りる。
+    let moved = false;
     for (const p of this.processions) {
-      // プレイヤーから遠いときは動かさない
-      if (Math.abs(p.center - player.s) < 600) {
-        p.center -= p.speed * dtGame;
-      }
-      for (const mem of p.members) {
-        const s = p.center + mem.ds;
-        const sm = this.route.sample(s, mem.du);
-        q.setFromAxisAngle(up, Math.atan2(-sm.tangent.z, sm.tangent.x) + Math.PI);
-        m.compose(sm.pos, q, scale);
-        this.procMesh.setMatrixAt(mem.index, m);
-      }
+      if (Math.abs(p.center - player.s) > 600) continue;
+      p.center -= p.speed * dtGame;
+      this._writeProcession(p);
+      moved = true;
     }
-    this.procMesh.instanceMatrix.needsUpdate = true;
+    if (moved) this.procMesh.instanceMatrix.needsUpdate = true;
 
     events.push(...this._checkProcession(player, nowMinutes));
     events.push(...this._checkStatics(player, nowMinutes));
