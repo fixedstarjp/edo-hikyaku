@@ -14,6 +14,7 @@ import { EdoClock } from './game/time.js';
 import { Sky } from './game/sky.js';
 import { Distance } from './game/distance.js';
 import { TouchControls, isCoarsePointer } from './game/touch.js';
+import { lockViewportScale } from './core/viewport.js';
 
 import manifest from './data/routes.generated.json';
 
@@ -22,6 +23,9 @@ import manifest from './data/routes.generated.json';
  * 携帯では鍵盤が無いので操作を差し替え、描画も控えめにする。
  */
 const COARSE = isCoarsePointer();
+
+// つまんで拡大されると HUD も操作盤もずれ、しかも戻せなくなる。
+if (COARSE) lockViewportScale();
 
 const canvas = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({

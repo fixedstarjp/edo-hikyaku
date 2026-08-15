@@ -478,6 +478,7 @@ body {
 }
 
 .stage-card {
+  touch-action: manipulation;
   display: grid;
   gap: 2px;
   align-content: start;
@@ -571,6 +572,8 @@ kbd {
 }
 
 button {
+  /* 二度叩きで拡大させない。叩き自体は素通しする。 */
+  touch-action: manipulation;
   font-family: var(--mincho);
   font-size: 21px;
   letter-spacing: 0.3em;
