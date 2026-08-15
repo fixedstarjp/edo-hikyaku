@@ -29,7 +29,7 @@ const TILE = 256;
 /** 切り出しの余白 (px)。小地図の窓の半分より大きくとる。 */
 const MARGIN_PX = 130;
 /** 各チャンネルの階調数。地図は平坦色ばかりなので落としても見分けがつかない。 */
-const POSTERIZE_LEVELS = 12;
+const POSTERIZE_LEVELS = 9;
 
 const DEG = Math.PI / 180;
 

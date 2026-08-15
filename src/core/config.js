@@ -55,6 +55,27 @@ export const CAMERA = {
   lag: 4.5,
 };
 
+/**
+ * よそ見。
+ * 走りながら首を回す。飛脚を軸に camera が回り込むので、
+ * 横を向けば海や城が正面に来る。手を離せば進行方向へ戻る。
+ */
+export const LOOK = {
+  /** 左右に振れる角度 (度) */
+  maxYaw: 135,
+  /** 上下に振れる角度 (度) */
+  maxPitch: 26,
+  /** キー操作の速さ (度/秒) */
+  keySpeed: 150,
+  /** マウス 1px あたりの角度 (度) */
+  mouseYaw: 0.28,
+  mousePitch: 0.2,
+  /** 手を離してから戻る速さ */
+  returnLag: 3.2,
+  /** 横を向いているあいだは霞を遠くまで払う */
+  fogFarLookaway: 900,
+};
+
 export const FOG = { near: 40, far: 340 };
 
 /** 沿道の生成に使う種。変えると町並みが変わる。 */

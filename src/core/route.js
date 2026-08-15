@@ -33,6 +33,11 @@ export class Route {
 
     this._buildFrames();
     this._shore = (src.shoreline?.byDistanceM ?? []).map(([d, v]) => [d, v]);
+    /** 水のある側。+1 が進行方向の左、-1 が右。水が無ければ 0。 */
+    this.waterSide = this._shore.length ? (src.shoreline.side ?? 1) : 0;
+    this.hasWater = this.waterSide !== 0;
+    /** 川幅 (m)。指定があれば対岸を作る。海なら null で水平線まで続く。 */
+    this.riverWidth = src.shoreline?.riverWidthM ?? null;
   }
 
   /** 各サンプル点での進行方向と左方向。中央差分で求めて継ぎ目のがたつきを消す。 */

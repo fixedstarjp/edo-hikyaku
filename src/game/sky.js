@@ -105,6 +105,8 @@ export class Sky {
 
     /** 水面の材質。空を映すので、刻に合わせて色を引き回す。 */
     this.water = null;
+    /** 遠景。刻に合わせて藍の濃さを変える。 */
+    this.distance = null;
   }
 
   /**
@@ -149,6 +151,11 @@ export class Sky {
     // 暮六つを過ぎても道が見える程度の下限は残す
     this.sun.intensity = 0.3 + 0.78 * light;
     this.ambient.intensity = 0.34 + 0.26 * light;
+
+    if (this.distance) {
+      this.distance.tint(this.uniforms.uHorizon.value, this.uniforms.uTop.value, light);
+      if (focus) this.distance.follow(focus);
+    }
 
     if (focus) {
       this.mesh.position.copy(focus);

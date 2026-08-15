@@ -14,6 +14,36 @@
     },
     "attribution": "地理院タイル"
   },
+  "nakasendo-01": {
+    "id": "nakasendo-01",
+    "image": "maps/nakasendo-01.png",
+    "zoom": 15,
+    "tileSize": 256,
+    "originPx": {
+      "x": 7449862,
+      "y": 3301254
+    },
+    "size": {
+      "w": 1554,
+      "h": 2052
+    },
+    "attribution": "地理院タイル"
+  },
+  "nikko-01": {
+    "id": "nikko-01",
+    "image": "maps/nikko-01.png",
+    "zoom": 15,
+    "tileSize": 256,
+    "originPx": {
+      "x": 7451135,
+      "y": 3301203
+    },
+    "size": {
+      "w": 880,
+      "h": 2103
+    },
+    "attribution": "地理院タイル"
+  },
   "tokaido-01": {
     "id": "tokaido-01",
     "image": "maps/tokaido-01.png",

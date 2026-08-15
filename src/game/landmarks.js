@@ -117,7 +117,6 @@ export class Landmarks {
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, material);
-    mesh.material.side = THREE.DoubleSide;
     this.group.add(mesh);
     return mesh;
   }
@@ -241,6 +240,11 @@ export class Landmarks {
       { u: Math.max(nearU, inner), y: roadY - 0.05 },
     ], materials.stone);
 
+    if (lm.moat.castle) {
+      this._castleAcross(lm, s0, s1, outer, side);
+      return;
+    }
+
     // 対岸の土手。城側は高く盛られている。
     const farU = outer + side * 12;
     this._ribbon(s0, s1, (s, roadY) => {
@@ -248,6 +252,98 @@ export class Landmarks {
       const b = { u: farU, y: roadY + bankM };
       return side > 0 ? [a, b] : [b, a];
     }, materials.turf);
+  }
+
+  /**
+   * 堀の対岸に立つ城。
+   *
+   * 水際から石垣が反り上がり、その上に白壁の多聞と隅櫓が載る。
+   * 天守は出さない。明暦三年(1657)の大火で焼け落ちたまま再建されず、
+   * この区間の時代（内藤新宿の開設は元禄十一年）にはもう無い。
+   */
+  _castleAcross(lm, s0, s1, outer, side) {
+    const { materials } = this;
+    const { wallH = 11, turrets = 2, pines = 14 } = lm.moat.castle;
+    // 石垣は水際からほぼ立ち上がる。緩く取ると丘に見えてしまう。
+    const toeU = outer + side * 1.2;
+    const stoneTop = outer + side * 4.5;
+    const backTop = outer + side * 95;
+
+    const order = (a, b) => (side > 0 ? [a, b] : [b, a]);
+
+    // 水際の腰。ここから上が石垣。
+    this._ribbon(s0, s1, (s, roadY) =>
+      order({ u: outer, y: roadY - 0.05 }, { u: toeU, y: roadY + 0.4 }),
+      materials.ishigaki
+    );
+    // 石垣。反り上がる。
+    this._ribbon(s0, s1, (s, roadY) =>
+      order({ u: toeU, y: roadY + 0.4 }, { u: stoneTop, y: roadY + wallH }),
+      materials.ishigaki
+    );
+    // 石垣の背後は森。北の丸は堀端より一段高い。
+    this._ribbon(s0, s1, (s, roadY) =>
+      order({ u: stoneTop, y: roadY + wallH }, { u: backTop, y: roadY + wallH + 16 }),
+      materials.turf
+    );
+
+    // 多聞 — 石垣の縁に沿って延びる白壁と、その上の瓦
+    const monU = stoneTop + side * 1.4;
+    this._ribbon(s0, s1, (s, roadY) =>
+      order({ u: monU - 1.4, y: roadY + wallH + 3.2 }, { u: monU + 1.4, y: roadY + wallH + 3.9 }),
+      materials.kawara
+    );
+    this._ribbon(s0, s1, (s, roadY) =>
+      order({ u: monU, y: roadY + wallH }, { u: monU, y: roadY + wallH + 3.4 }),
+      materials.plaster
+    );
+
+    // 隅櫓 — 二重の櫓を等間隔に置く
+    for (let k = 0; k < turrets; k++) {
+      const s = s0 + ((s1 - s0) * (k + 0.5)) / turrets;
+      const at = this._at(s, stoneTop + side * 5);
+      const base = at.pos.y + wallH;
+
+      const lower = new THREE.Mesh(new THREE.BoxGeometry(9, 4.2, 9), materials.plaster);
+      lower.position.copy(at.pos).setY(base + 2.1);
+      lower.rotation.y = at.yaw;
+      this.group.add(lower);
+
+      const lowerRoof = new THREE.Mesh(roofPrism(), materials.kawara);
+      lowerRoof.scale.set(11, 1.8, 11);
+      lowerRoof.position.copy(at.pos).setY(base + 4.2);
+      lowerRoof.rotation.y = at.yaw;
+      this.group.add(lowerRoof);
+
+      const upper = new THREE.Mesh(new THREE.BoxGeometry(6.4, 3.4, 6.4), materials.plaster);
+      upper.position.copy(at.pos).setY(base + 7.4);
+      upper.rotation.y = at.yaw;
+      this.group.add(upper);
+
+      const upperRoof = new THREE.Mesh(roofPrism(), materials.kawara);
+      upperRoof.scale.set(8.4, 2.4, 8.4);
+      upperRoof.position.copy(at.pos).setY(base + 9.1);
+      upperRoof.rotation.y = at.yaw;
+      this.group.add(upperRoof);
+    }
+
+    // 土手の松
+    const rng = makeRng(1657);
+    for (let k = 0; k < pines; k++) {
+      const s = rng.range(s0, s1);
+      const d = rng.range(10, 80);
+      const at = this._at(s, stoneTop + side * d);
+      // 背後の森は土手の傾きに乗せる
+      const rise = wallH + (16 * d) / 95;
+      const h = rng.range(9, 16);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.5, h, 6), materials.wood);
+      trunk.position.copy(at.pos).setY(at.pos.y + rise + h / 2);
+      this.group.add(trunk);
+      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(rng.range(4.2, 7), 1), materials.tree);
+      crown.position.copy(at.pos).setY(at.pos.y + rise + h * 0.92);
+      crown.scale.y = 0.6;
+      this.group.add(crown);
+    }
   }
 
   /* ------------------------------------------------------------ 門 */
@@ -277,7 +373,7 @@ export class Landmarks {
     nuki.rotation.y = yaw;
     this.group.add(nuki);
 
-    const roof = new THREE.Mesh(roofPrism(), materials.roof);
+    const roof = new THREE.Mesh(roofPrism(), materials.kawara);
     roof.scale.set(width * 1.35, height * 0.2, width * 0.5);
     roof.position.copy(at.pos).setY(at.pos.y + height * 0.99);
     roof.rotation.y = yaw;
@@ -306,7 +402,7 @@ export class Landmarks {
       const p = at.pos.clone().addScaledVector(alongRoad, dx).setY(at.pos.y + 1.8);
       this._box(new THREE.Vector3(0.24, 3.6, 0.24), { ...at, pos: p }, materials.wood);
     }
-    const roof = new THREE.Mesh(roofPrism(), materials.roof);
+    const roof = new THREE.Mesh(roofPrism(), materials.kawara);
     roof.scale.set(5.4, 0.8, 2.0);
     roof.position.copy(at.pos).setY(at.pos.y + 3.5);
     roof.rotation.y = at.yaw;
@@ -430,7 +526,7 @@ export class Landmarks {
     // 問屋場 — ここが継立の場、すなわち終点
     const at = this._at(lm.s, -(route.widthAt(lm.s) / 2 + 5.5));
     this._box(new THREE.Vector3(11, 3.4, 8), { ...at, pos: at.pos.clone().setY(at.pos.y + 1.7) }, materials.plaster);
-    const roof = new THREE.Mesh(roofPrism(), materials.roof);
+    const roof = new THREE.Mesh(roofPrism(), materials.kawara);
     roof.scale.set(12.6, 2.4, 9.4);
     roof.position.copy(at.pos).setY(at.pos.y + 3.4);
     roof.rotation.y = at.yaw;

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import './styles.css';
 import { Route } from './core/route.js';
 import { PALETTE, toonGradient } from './core/palette.js';
-import { CAMERA, FOG, FAST_FORWARD, SPEED, TIME_SCALE } from './core/config.js';
+import { CAMERA, FOG, FAST_FORWARD, LOOK, SPEED, TIME_SCALE } from './core/config.js';
 import { buildTerrain, makeRoadTexture, makeSeaTexture } from './game/terrain.js';
 import { buildTownscape } from './game/townscape.js';
 import { Landmarks } from './game/landmarks.js';
@@ -12,6 +12,7 @@ import { Hud } from './game/hud.js';
 import { Minimap } from './game/minimap.js';
 import { EdoClock } from './game/time.js';
 import { Sky } from './game/sky.js';
+import { Distance } from './game/distance.js';
 
 import manifest from './data/routes.generated.json';
 
@@ -34,29 +35,38 @@ const materials = {
   ground: toon(0xffffff, { vertexColors: true }),
   road: toon(0xffffff, { map: makeRoadTexture() }),
   sea: toon(0xffffff, { map: makeSeaTexture() }),
+  // building / roof / noren / foliage は InstancedMesh で instanceColor に染められる。
+  // 単体で置くものにそのまま使うと真っ白になるので、名所用は別に持つ。
   building: toon(0xffffff),
   roof: toon(0xffffff),
+  noren: toon(0xffffff),
+  foliage: toon(0xffffff),
+  kawara: toon(0x474b52, { side: THREE.DoubleSide }),
+  tree: toon(PALETTE.matsuba),
+
   eaves: toon(0x3b2f24),
   shopfront: toon(0x6b5236),
-  noren: toon(0xffffff),
   wood: toon(PALETTE.ki),
-  tree: toon(PALETTE.matsuba),
   deck: toon(0xa07c4f),
-  foliage: toon(0xffffff),
-  stone: toon(0x8e8b84),
-  plaster: toon(PALETTE.kabe),
+  // 帯状に張るものは裏からも見えるようにしておく
+  stone: toon(0x8e8b84, { side: THREE.DoubleSide }),
+  // 城の石垣。街道の石より暗く冷たい色にして、白い坂に見えないようにする。
+  ishigaki: toon(0x6a675f, { side: THREE.DoubleSide }),
+  plaster: toon(PALETTE.kabe, { side: THREE.DoubleSide }),
+  turf: toon(0x6d7d55, { side: THREE.DoubleSide }),
+  canal: toon(0x35566d, { side: THREE.DoubleSide }),
   bengara: toon(PALETTE.bengara),
   iron: toon(0x3a3a3c),
   brass: toon(0x9a7d3c),
-  turf: toon(0x6d7d55),
   thatch: toon(0xa08c62),
-  canal: toon(0x35566d),
   cloth: toon(0xffffff),
   goyobako: toon(0x3a2f28),
+  sail: toon(0xe6dfcd, { side: THREE.DoubleSide }),
 };
 
 const sky = new Sky(scene);
 sky.water = materials.sea;
+sky.distance = new Distance(scene);
 scene.fog.near = FOG.near;
 scene.fog.far = FOG.far;
 
@@ -121,15 +131,42 @@ function disposeStage() {
 
 /* ------------------------------------------------------------- 入力 */
 
-const input = { forward: false, back: false, left: false, right: false, sprint: false, jump: false, fast: false };
+const input = {
+  forward: false, back: false, left: false, right: false,
+  sprint: false, jump: false, fast: false,
+  lookLeft: false, lookRight: false,
+};
 const KEYS = {
   KeyW: 'forward', ArrowUp: 'forward',
   KeyS: 'back', ArrowDown: 'back',
   KeyA: 'left', ArrowLeft: 'left',
   KeyD: 'right', ArrowRight: 'right',
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
+  KeyQ: 'lookLeft', KeyE: 'lookRight',
   KeyF: 'fast',
 };
+
+/** 右ボタンを押しているあいだ、マウスで首を回す。 */
+const mouseLook = { active: false, yaw: 0, pitch: 0 };
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.button !== 2) return;
+  mouseLook.active = true;
+  mouseLook.yaw = look.yaw;
+  mouseLook.pitch = look.pitch;
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!mouseLook.active) return;
+  mouseLook.yaw -= THREE.MathUtils.degToRad(e.movementX * LOOK.mouseYaw);
+  mouseLook.pitch -= THREE.MathUtils.degToRad(e.movementY * LOOK.mousePitch);
+});
+const releaseLook = () => {
+  mouseLook.active = false;
+};
+canvas.addEventListener('pointerup', releaseLook);
+canvas.addEventListener('pointercancel', releaseLook);
 
 addEventListener('keydown', (e) => {
   if (e.code === 'Space') {
@@ -159,6 +196,7 @@ addEventListener('keyup', (e) => {
 
 addEventListener('blur', () => {
   for (const k of Object.keys(input)) input[k] = false;
+  mouseLook.active = false;
 });
 
 addEventListener('resize', () => {
@@ -212,18 +250,62 @@ function backToTitle() {
 
 const camTarget = new THREE.Vector3();
 const camLook = new THREE.Vector3();
+const camDir = new THREE.Vector3();
 const sm = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
+const UP = new THREE.Vector3(0, 1, 0);
+
+/** よそ見の向き。0 のとき進行方向。 */
+const look = { yaw: 0, pitch: 0 };
+
+function updateLook(dtWall) {
+  const max = THREE.MathUtils.degToRad(LOOK.maxYaw);
+  const maxP = THREE.MathUtils.degToRad(LOOK.maxPitch);
+
+  if (mouseLook.active) {
+    look.yaw = THREE.MathUtils.clamp(mouseLook.yaw, -max, max);
+    look.pitch = THREE.MathUtils.clamp(mouseLook.pitch, -maxP, maxP);
+  } else {
+    const key = (input.lookLeft ? 1 : 0) - (input.lookRight ? 1 : 0);
+    if (key !== 0) {
+      look.yaw = THREE.MathUtils.clamp(
+        look.yaw + key * THREE.MathUtils.degToRad(LOOK.keySpeed) * dtWall, -max, max
+      );
+    } else {
+      // 手を離したら正面へ戻る
+      const k = 1 - Math.exp(-LOOK.returnLag * dtWall);
+      look.yaw += (0 - look.yaw) * k;
+      look.pitch += (0 - look.pitch) * k;
+    }
+  }
+}
+
+function isLookingAway() {
+  return Math.abs(look.yaw) > 0.18;
+}
 
 function placeCamera(snap) {
   const { route, landmarks, player } = stage;
+
   route.sample(player.s, player.u * 0.5, sm);
-  camTarget.set(sm.pos.x, sm.pos.y + landmarks.liftAt(player.s) + CAMERA.height, sm.pos.z);
-  camTarget.addScaledVector(sm.tangent, -CAMERA.distance);
+  const focusY = sm.pos.y + landmarks.liftAt(player.s) + CAMERA.lookHeight;
+
+  // 進行方向を yaw だけ回した向き。これがいま見ている方角。
+  camDir.copy(sm.tangent).applyAxisAngle(UP, look.yaw);
+
+  camTarget.set(sm.pos.x, focusY + (CAMERA.height - CAMERA.lookHeight), sm.pos.z);
+  camTarget.addScaledVector(camDir, -CAMERA.distance);
   if (snap) camera.position.copy(camTarget);
 
-  const ahead = player.s + CAMERA.lookAhead;
-  route.sample(ahead, player.u * 0.35, sm);
-  camLook.set(sm.pos.x, sm.pos.y + landmarks.liftAt(ahead) + CAMERA.lookHeight, sm.pos.z);
+  if (Math.abs(look.yaw) < 1e-3) {
+    // 正面を向いているときは街道の先を見る。カーブで内側が見えるように。
+    const ahead = player.s + CAMERA.lookAhead;
+    route.sample(ahead, player.u * 0.35, sm);
+    camLook.set(sm.pos.x, sm.pos.y + landmarks.liftAt(ahead) + CAMERA.lookHeight, sm.pos.z);
+  } else {
+    route.sample(player.s, player.u * 0.5, sm);
+    camLook.set(sm.pos.x, focusY, sm.pos.z).addScaledVector(camDir, CAMERA.lookAhead);
+    camLook.y += Math.tan(look.pitch) * CAMERA.lookAhead;
+  }
   camera.lookAt(camLook);
 }
 
@@ -272,17 +354,20 @@ function step(dtWall) {
     if (lm.s > 1) hud.banner(lm);
   }
 
-  // 大木戸の開閉
+  // 刻限。大木戸のある街道は門が閉まって通れなくなり、
+  // 無い街道は問屋場への継立の刻限として効く（遅れれば遅参）。
   const closesAt = route.gate?.closesAtMinutes ?? Infinity;
   const gateClosed = clock.minutes >= closesAt;
+  const blocks = route.gate?.kind !== 'keijitsu';
+
   if (gateLandmark) {
-    landmarks.setGateClosed(gateClosed && player.s < gateLandmark.s);
+    if (blocks) landmarks.setGateClosed(gateClosed && player.s < gateLandmark.s);
 
     if (stage.gatePassedAt === null && player.s >= gateLandmark.s) {
       stage.gatePassedAt = clock.minutes;
-      if (!gateClosed) hud.toast(route.gate.passText, { strong: true });
+      if (!gateClosed && route.gate.passText) hud.toast(route.gate.passText, { strong: true });
     }
-    if (gateClosed && player.s < gateLandmark.s && player.s > gateLandmark.s - 3.2) {
+    if (blocks && gateClosed && player.s < gateLandmark.s && player.s > gateLandmark.s - 3.2) {
       player.s = gateLandmark.s - 3.2;
       player.speed = 0;
       finish('gate');
@@ -295,12 +380,18 @@ function step(dtWall) {
     return;
   }
 
+  updateLook(dtWall);
   placeCamera(false);
-  camera.position.lerp(camTarget, 1 - Math.exp(-CAMERA.lag * dtWall));
+  // よそ見のあいだは追従を速くして、首を振った先がすぐ見えるようにする
+  camera.position.lerp(camTarget, 1 - Math.exp(-(isLookingAway() ? 12 : CAMERA.lag) * dtWall));
 
-  const targetFov = CAMERA.fov + (player.speed > SPEED.run * 1.05 ? 5 : 0);
+  const targetFov = CAMERA.fov + (player.speed > SPEED.run * 1.05 && !isLookingAway() ? 5 : 0);
   camera.fov += (targetFov - camera.fov) * Math.min(1, dtWall * 4);
   camera.updateProjectionMatrix();
+
+  // 横を向いたら霞を払う。海や城を遠くまで見せるため。
+  const wantFar = isLookingAway() ? LOOK.fogFarLookaway : FOG.far;
+  scene.fog.far += (wantFar - scene.fog.far) * Math.min(1, dtWall * 2.5);
 
   sky.update(clock, camera.position);
   hud.update({ player, clock, gateClosed });
@@ -328,17 +419,21 @@ function showResult(kind) {
     ['平均の脚', `${avg.toFixed(1)} km/h`],
     ['着いた刻', clock.label],
   ];
+  let late = false;
   if (stage.gatePassedAt !== null && route.gate) {
     const margin = Math.round(route.gate.closesAtMinutes - stage.gatePassedAt);
-    rows.push([`${gateLandmark.name}を抜けた刻`, `暮六つの ${margin} 分前`]);
+    late = margin < 0;
+    const label = route.gate.kind === 'keijitsu' ? '刻限' : `${gateLandmark.name}を抜けた刻`;
+    rows.push([label, late ? `刻限を ${-margin} 分過ぎた` : `刻限の ${margin} 分前`]);
   }
   rows.push(['咎め', `${stage.penalties} 度`]);
   rows.push(['人にぶつかった', `${stage.bumps} 度`]);
 
   if (kind === 'arrived') {
-    document.getElementById('result-title').textContent = `${route.meta.to} 着`;
-    document.getElementById('result-sub').textContent =
-      stage.penalties === 0
+    document.getElementById('result-title').textContent = late ? '遅参' : `${route.meta.to} 着`;
+    document.getElementById('result-sub').textContent = late
+      ? (route.gate.lateText ?? '刻限に遅れた。継飛脚の名折れである。')
+      : stage.penalties === 0
         ? '滞りなく継立の問屋場へ入った。次の飛脚が先へ発つ。'
         : '道中で咎めを受けたが、ともかく荷は届いた。';
   } else {

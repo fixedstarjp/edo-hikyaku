@@ -42,6 +42,49 @@
         "maxElevation": 36.28,
         "maxGradePermil": 89
       }
+    },
+    {
+      "id": "nakasendo-01",
+      "road": "中山道",
+      "stage": 1,
+      "order": 3,
+      "name": "日本橋 → 板橋宿",
+      "from": "日本橋",
+      "to": "板橋宿",
+      "summary": "中山道の第一区間。神田から筋違を抜けて神田川を渡り、湯島の坂を登って本郷の武家地を貫き、巣鴨の在郷道を経て板橋宿へ。",
+      "totalLength": 8969.7,
+      "historicalDistance": {
+        "ri": 2,
+        "cho": 10,
+        "km": 8.95,
+        "source": "日本橋〜板橋宿 二里十丁（史料により二里余とも）"
+      },
+      "stats": {
+        "minElevation": 3.94,
+        "maxElevation": 26.74,
+        "maxGradePermil": 62
+      }
+    },
+    {
+      "id": "nikko-01",
+      "road": "日光道中・奥州道中",
+      "stage": 1,
+      "order": 4,
+      "name": "日本橋 → 千住宿",
+      "from": "日本橋",
+      "to": "千住宿",
+      "summary": "日光道中と奥州道中の第一区間。大伝馬町から東へ折れ、浅草見附を抜けて隅田川沿いを北へ。御蔵・浅草寺の門前を過ぎ、千住大橋を渡る。",
+      "totalLength": 8115,
+      "historicalDistance": {
+        "ri": 2,
+        "km": 7.85,
+        "source": "日本橋〜千住宿 二里"
+      },
+      "stats": {
+        "minElevation": 0.7,
+        "maxElevation": 4.74,
+        "maxGradePermil": 10
+      }
     }
   ]
 }
