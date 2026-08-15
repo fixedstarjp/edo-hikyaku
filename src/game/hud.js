@@ -22,6 +22,7 @@ export class Hud {
       toast: document.getElementById('toast'),
       banner: document.getElementById('banner'),
       bannerName: document.getElementById('banner-name'),
+      bannerKana: document.getElementById('banner-kana'),
       bannerNote: document.getElementById('banner-note'),
     };
 
@@ -94,6 +95,7 @@ export class Hud {
   banner(landmark) {
     const { el } = this;
     el.bannerName.textContent = landmark.name;
+    el.bannerKana.textContent = landmark.kana ?? '';
     el.bannerNote.textContent = landmark.note;
     el.banner.hidden = false;
     el.banner.classList.remove('out');
@@ -108,7 +110,8 @@ export class Hud {
       setTimeout(() => {
         el.banner.hidden = true;
       }, 600);
-    }, 4200);
+      // 名所が増えたので、読み切れる長さは確保しつつ次に譲る
+    }, 6500);
   }
 
   toast(text, { strong = false } = {}) {
