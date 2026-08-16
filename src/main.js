@@ -417,6 +417,8 @@ function step(dtWall) {
     if (player.s < lm.s - 45) continue;
     stage.seenLandmarks.add(lm.name);
     if (lm.s > 1) hud.banner(lm);
+    // 見どころでは、どちらを向けば何が見えるかを報せる
+    if (lm.lookHint) hud.toast(lm.lookHint, { strong: true });
   }
 
   // 刻限。大木戸のある街道は門が閉まって通れなくなり、

@@ -63,8 +63,15 @@
         <span class="touch-hint">避ける<br />↓緩める</span>
       </div>
       <div class="touch-buttons">
-        <button id="touch-sprint" class="touch-btn">全力</button>
-        <button id="touch-jump" class="touch-btn">跳</button>
+        <div class="touch-look">
+          <button id="touch-look-left" class="touch-look-btn">◀</button>
+          <span class="touch-look-label">見る</span>
+          <button id="touch-look-right" class="touch-look-btn">▶</button>
+        </div>
+        <div class="touch-row">
+          <button id="touch-sprint" class="touch-btn">全力</button>
+          <button id="touch-jump" class="touch-btn">跳</button>
+        </div>
       </div>
     </div>
 
@@ -98,9 +105,9 @@
         </div>
         <div class="title-keys touch-keys" id="title-keys-touch" hidden>
           <div>飛脚はひとりでに走る</div>
-          <div>左下の輪 — 横へ引いて避ける／下へ引いて緩める</div>
-          <div>右下 — 全力（押しっぱなし）と跳ぶ</div>
-          <div>画面をなぞる — よそ見。離せば前を向く</div>
+          <div>左下の輪 — 倒すほど大きく避ける／下へ引いて緩める</div>
+          <div><b>◀ 見る ▶</b> — 押しているあいだ横を向く。離せば前へ戻る</div>
+          <div>全力（押しっぱなし）と跳ぶ</div>
         </div>
         <button id="start-button" disabled>出立</button>
         <p class="title-credit">

@@ -665,8 +665,57 @@ button:disabled {
 
 .touch-buttons {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.touch-row {
+  display: flex;
   gap: 14px;
   align-items: flex-end;
+}
+
+/* 見回しの左右揺り。なぞり方を覚えなくても押せば見回せる。 */
+.touch-look {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid rgba(232, 220, 195, 0.34);
+  background: rgba(20, 17, 14, 0.44);
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.touch-look-btn {
+  pointer-events: auto;
+  touch-action: none;
+  width: 54px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--gothic);
+  font-size: 15px;
+  letter-spacing: 0;
+  text-indent: 0;
+  color: var(--kinari);
+}
+
+.touch-look-btn.on {
+  background: rgba(184, 146, 90, 0.42);
+}
+
+.touch-look-label {
+  align-self: center;
+  padding: 0 4px;
+  font-family: var(--mincho);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  border-left: 1px solid rgba(232, 220, 195, 0.24);
+  border-right: 1px solid rgba(232, 220, 195, 0.24);
+  line-height: 42px;
 }
 
 .touch-btn {
@@ -1062,6 +1111,20 @@ button:disabled {
     width: 80px;
     height: 80px;
     font-size: 20px;
+  }
+
+  .touch-look-btn {
+    width: 46px;
+    height: 38px;
+  }
+
+  .touch-look-label {
+    font-size: 12px;
+    line-height: 38px;
+  }
+
+  #banner {
+    bottom: 200px;
   }
 }
 

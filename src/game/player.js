@@ -16,6 +16,7 @@ export class Player {
     this.s = 0;
     this.u = 0;
     this.speed = 0;
+    this.strafe = 0; // 横移動の速さ (-1..1)。入力に追従して動く。
     this.stamina = STAMINA.max;
     this.exhausted = false;
     this.stunUntil = 0; // 足止めが解けるゲーム内時刻 (分)
@@ -35,6 +36,7 @@ export class Player {
     this.s = 0;
     this.u = 0;
     this.speed = 0;
+    this.strafe = 0;
     this.stamina = STAMINA.max;
     this.exhausted = false;
     this.stunUntil = 0;
@@ -183,13 +185,20 @@ export class Player {
     // 前進
     this.s = Math.min(this.route.length, this.s + this.speed * dt);
 
-    // 左右
-    const strafe = (input.left ? 1 : 0) - (input.right ? 1 : 0);
-    if (!stunned && strafe !== 0) {
-      this.u += strafe * SPEED.strafe * dt;
-    }
+    // 左右。
+    // 触れる操作は倒し具合を input.lateral (-1..1) で渡してくる。鍵盤は ±1。
+    // どちらも同じ軸に足し込んでから、速さを追従させる。
+    const wanted = stunned
+      ? 0
+      : THREE.MathUtils.clamp(
+          (input.lateral ?? 0) + (input.left ? 1 : 0) - (input.right ? 1 : 0),
+          -1,
+          1
+        );
+    this.strafe += (wanted - this.strafe) * Math.min(1, dt * SPEED.strafeResponse);
+    this.u += this.strafe * SPEED.strafe * dt;
     this.u = THREE.MathUtils.clamp(this.u, -this.maxLateral, this.maxLateral);
-    this.lean += (strafe * -0.16 - this.lean) * Math.min(1, dt * 6);
+    this.lean += (this.strafe * -0.16 - this.lean) * Math.min(1, dt * 6);
 
     // 跳ぶ
     if (input.jump && !this.airborne && !stunned) {

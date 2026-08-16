@@ -9,10 +9,12 @@
  *   画面のどこか … 引けばよそ見。離せば正面へ戻る
  */
 
-/** 輪の中心からこれだけ動かしたら効き始める (px)。 */
-const DEAD_ZONE = 14;
+/** 輪の中心からこれだけ動かしたら効き始める (px)。ここまでは遊び。 */
+const DEAD_ZONE = 20;
+/** ここまで倒すと横移動が振り切る (px)。 */
+const FULL_TILT = 62;
 /** 下へこれだけ引いたら歩みを緩める (px)。 */
-const SLOW_PULL = 34;
+const SLOW_PULL = 40;
 /** これだけ動かして初めて「よそ見」とみなす。触れただけでは動かさない。 */
 const LOOK_SLOP = 8;
 
@@ -48,6 +50,9 @@ export class TouchControls {
     this._bindPad(document.getElementById('touch-pad'));
     this._bindHold(document.getElementById('touch-sprint'), 'sprint');
     this._bindTap(document.getElementById('touch-jump'));
+    // 見回しは釦でもできるようにする。なぞって覚えるより分かりやすい。
+    this._bindHold(document.getElementById('touch-look-left'), 'lookLeft');
+    this._bindHold(document.getElementById('touch-look-right'), 'lookRight');
     this._bindLook(document.getElementById('stage'));
   }
 
@@ -57,10 +62,14 @@ export class TouchControls {
     this.lookId = null;
     this.input.forward = true;
     this.input.back = false;
-    this.input.left = false;
-    this.input.right = false;
+    this.input.lateral = 0;
     this.input.sprint = false;
+    this.input.lookLeft = false;
+    this.input.lookRight = false;
     this.drag.active = false;
+    for (const id of ['touch-sprint', 'touch-jump', 'touch-look-left', 'touch-look-right']) {
+      document.getElementById(id)?.classList.remove('on');
+    }
   }
 
   _bindPad(pad) {
@@ -70,8 +79,13 @@ export class TouchControls {
     const update = (e) => {
       const dx = e.clientX - origin.x;
       const dy = e.clientY - origin.y;
-      this.input.left = dx < -DEAD_ZONE;
-      this.input.right = dx > DEAD_ZONE;
+
+      // 倒し具合をそのまま横移動の強さにする。
+      // 二乗で効かせるので、半分倒しても四分の一の速さにしかならない。
+      // 閾値で切り替えると、少し触れただけで全速で横へ飛んでしまう。
+      const t = Math.min(1, Math.max(0, Math.abs(dx) - DEAD_ZONE) / (FULL_TILT - DEAD_ZONE));
+      this.input.lateral = dx === 0 ? 0 : -Math.sign(dx) * t * t;
+
       // 下へ引くと緩める。行列を行き過ごすのに使う。
       const slow = dy > SLOW_PULL;
       this.input.back = slow;
@@ -97,8 +111,7 @@ export class TouchControls {
     const release = (e) => {
       if (e.pointerId !== this.padId) return;
       this.padId = null;
-      this.input.left = false;
-      this.input.right = false;
+      this.input.lateral = 0;
       this.input.back = false;
       this.input.forward = true;
       knob.style.transform = '';
