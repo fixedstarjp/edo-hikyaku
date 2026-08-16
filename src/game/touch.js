@@ -1,11 +1,11 @@
 /**
  * 触れて遊ぶための操作。
  *
- * 鍵盤が無いので、走るのを既定にする。指を離していても飛脚は走り続け、
- * 親指でやることは「避ける」「緩める」「全力」「跳ぶ」「よそ見」の五つだけにした。
+ * 左下の輪が足まわり。上へ押しているあいだ走り、離せば歩みに落ちる。
+ * 横に倒せば避け、下へ引けば止まる。鍵盤の W / A・D / S と同じ割り当て。
  *
- *   左下の輪   … 横へ引けば避ける。下へ引けば歩みを緩める（行列を行き過ごすとき）
- *   右下の二つ … 全力（押している間）と跳ぶ
+ *   左下の輪   … 上へ押して走る。横へ倒して避ける。下へ引いて止まる
+ *   右下の三つ … 見回し（左右）、全力、跳ぶ
  *   画面のどこか … 引けばよそ見。離せば正面へ戻る
  */
 
@@ -13,7 +13,9 @@
 const DEAD_ZONE = 20;
 /** ここまで倒すと横移動が振り切る (px)。 */
 const FULL_TILT = 62;
-/** 下へこれだけ引いたら歩みを緩める (px)。 */
+/** 上へこれだけ押したら走る (px)。 */
+const RUN_PUSH = 20;
+/** 下へこれだけ引いたら止まる (px)。 */
 const SLOW_PULL = 40;
 /** これだけ動かして初めて「よそ見」とみなす。触れただけでは動かさない。 */
 const LOOK_SLOP = 8;
@@ -44,8 +46,6 @@ export class TouchControls {
     this.lookFrom = null;
     this.lookBase = { yaw: 0, pitch: 0 };
 
-    // 触れていなくても走り続ける
-    input.forward = true;
 
     this._bindPad(document.getElementById('touch-pad'));
     this._bindHold(document.getElementById('touch-sprint'), 'sprint');
@@ -60,7 +60,7 @@ export class TouchControls {
   reset() {
     this.padId = null;
     this.lookId = null;
-    this.input.forward = true;
+    this.input.forward = false;
     this.input.back = false;
     this.input.lateral = 0;
     this.input.sprint = false;
@@ -86,15 +86,18 @@ export class TouchControls {
       const t = Math.min(1, Math.max(0, Math.abs(dx) - DEAD_ZONE) / (FULL_TILT - DEAD_ZONE));
       this.input.lateral = dx === 0 ? 0 : -Math.sign(dx) * t * t;
 
-      // 下へ引くと緩める。行列を行き過ごすのに使う。
+      // 縦は足まわり。上へ押しているあいだだけ走り、下へ引けば止まる。
+      // 押していないときは歩き（鍵盤で何も押していないときと同じ）。
+      const run = dy < -RUN_PUSH;
       const slow = dy > SLOW_PULL;
+      this.input.forward = run;
       this.input.back = slow;
-      this.input.forward = !slow;
 
       const r = 34;
       const k = Math.hypot(dx, dy);
       const s = k > r ? r / k : 1;
       knob.style.transform = `translate(${dx * s}px, ${dy * s}px)`;
+      pad.classList.toggle('run', run);
       pad.classList.toggle('slow', slow);
     };
 
@@ -113,9 +116,9 @@ export class TouchControls {
       this.padId = null;
       this.input.lateral = 0;
       this.input.back = false;
-      this.input.forward = true;
+      this.input.forward = false;
       knob.style.transform = '';
-      pad.classList.remove('slow');
+      pad.classList.remove('run', 'slow');
     };
     pad.addEventListener('pointerup', release);
     pad.addEventListener('pointercancel', release);

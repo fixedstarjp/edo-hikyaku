@@ -639,6 +639,10 @@ button:disabled {
   place-items: center;
 }
 
+#touch-pad.run {
+  border-color: rgba(183, 207, 126, 0.85);
+}
+
 #touch-pad.slow {
   border-color: rgba(240, 168, 119, 0.8);
 }

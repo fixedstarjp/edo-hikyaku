@@ -19,6 +19,7 @@ const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _up = new THREE.Vector3(0, 1, 0);
 const _one = new THREE.Vector3(1, 1, 1);
+const _v = new THREE.Vector3();
 const _sample = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
 
 
@@ -31,8 +32,8 @@ export class Crowd {
     const rng = makeRng(WORLD_SEED ^ 0x5f5f);
     this.rng = rng;
 
-    this.statics = [];
-    this.movers = [];
+    this.statics = []; // 立ち話や店先。位置は動かない
+    this.movers = []; // 街道を歩いている者。毎コマ動く
     this.processions = [];
 
     this._spawnTownsfolk(rng);
@@ -44,6 +45,13 @@ export class Crowd {
   }
 
   reset() {
+    for (const m of this.movers) {
+      m.s = m.baseS;
+      m.hitAt = undefined;
+    }
+    this._writeMovers();
+    for (const o of this.statics) o.hitAt = undefined;
+
     for (const p of this.processions) {
       p.center = p.baseCenter;
       p.scolded = false;
@@ -77,16 +85,36 @@ export class Crowd {
         // 端に寄っているほど多い。街道の中央は空けて歩くもの。
         const bias = rng() ** 0.55;
         const u = (rng.chance(0.5) ? -1 : 1) * bias * (half - 0.7);
-        this.statics.push({
-          kind: 'walker',
-          s: s + rng.range(-3, 3),
-          u,
-          rs: 1.0,
-          ru: 0.62,
-          yaw: rng() * Math.PI * 2,
-          scale: rng.range(0.92, 1.08),
-          color: new THREE.Color(TOWNSFOLK_COLORS[rng.int(0, TOWNSFOLK_COLORS.length - 1)]),
-        });
+        const scale = rng.range(0.92, 1.08);
+        const color = new THREE.Color(TOWNSFOLK_COLORS[rng.int(0, TOWNSFOLK_COLORS.length - 1)]);
+
+        // 三割ほどは街道を歩いている。上りも下りもいる。
+        if (rng.chance(0.3)) {
+          const dir = rng.chance(0.5) ? 1 : -1;
+          this.movers.push({
+            baseS: s,
+            s: s + rng.range(-3, 3),
+            u,
+            dir,
+            speed: rng.range(0.85, 1.5),
+            phase: rng() * Math.PI * 2,
+            rs: 1.0,
+            ru: 0.62,
+            scaleV: new THREE.Vector3(scale, scale, scale),
+            color,
+          });
+        } else {
+          this.statics.push({
+            kind: 'walker',
+            s: s + rng.range(-3, 3),
+            u,
+            rs: 1.0,
+            ru: 0.62,
+            yaw: rng() * Math.PI * 2,
+            scale,
+            color,
+          });
+        }
       }
 
       if (rng.chance(0.05)) {
@@ -152,6 +180,22 @@ export class Crowd {
     this.staticMesh = instanced(this.personGeo, materials.cloth, walkers.map((o) => this._itemFor(o)));
     this.group.add(this.staticMesh);
 
+    // 歩いている者。位置は毎コマ書き換えるので、色だけ先に入れておく。
+    this.moverMesh = new THREE.InstancedMesh(
+      this.personGeo,
+      materials.cloth,
+      Math.max(1, this.movers.length)
+    );
+    this.moverMesh.frustumCulled = false;
+    this.moverMesh.count = this.movers.length;
+    this.movers.forEach((m, i) => {
+      m.index = i;
+      this.moverMesh.setColorAt(i, m.color);
+    });
+    if (this.moverMesh.instanceColor) this.moverMesh.instanceColor.needsUpdate = true;
+    this.group.add(this.moverMesh);
+    this._writeMovers();
+
     this.cartMesh = instanced(this.cartGeo, materials.wood, carts.map((o) => this._itemFor(o)));
     this.group.add(this.cartMesh);
 
@@ -202,8 +246,31 @@ export class Crowd {
     }
   }
 
+  /** 歩いている者を今の位置へ置く。near を渡すとその近くだけ書き換える。 */
+  _writeMovers(near = null) {
+    for (const m of this.movers) {
+      if (near !== null && Math.abs(m.s - near) > 400) continue;
+      const sm = this.route.sample(m.s, m.u, _sample);
+      // 進む向きへ体を向ける。すれ違う者はこちらを向く。
+      _q.setFromAxisAngle(_up, Math.atan2(-sm.tangent.z, sm.tangent.x) + (m.dir > 0 ? 0 : Math.PI));
+      _v.copy(sm.pos);
+      _v.y += Math.abs(Math.sin(m.phase)) * 0.05; // 歩くたびに上下する
+      _m.compose(_v, _q, m.scaleV);
+      this.moverMesh.setMatrixAt(m.index, _m);
+    }
+    this.moverMesh.instanceMatrix.needsUpdate = true;
+  }
+
   update(dtGame, player, nowMinutes) {
     const events = [];
+
+    // 街道を歩いている者。端まで行ったら向きを変えて戻る。
+    for (const m of this.movers) {
+      m.s += m.dir * m.speed * dtGame;
+      if (m.s < 20 || m.s > this.route.length - 20) m.dir *= -1;
+      m.phase += dtGame * m.speed * 3.2;
+    }
+    this._writeMovers(player.s);
 
     // 遠い行列は動かさないし、行列も書き換えない。
     // 位置は最後に書いたままで正しいので、近づいてから書き直せば足りる。
@@ -218,6 +285,24 @@ export class Crowd {
 
     events.push(...this._checkProcession(player, nowMinutes));
     events.push(...this._checkStatics(player, nowMinutes));
+    events.push(...this._checkMovers(player, nowMinutes));
+    return events;
+  }
+
+  /** 歩いている者との衝突。位置が動くので並べ替えは効かず、素直に舐める。 */
+  _checkMovers(player, nowMinutes) {
+    const events = [];
+    for (const m of this.movers) {
+      if (Math.abs(m.s - player.s) > m.rs) continue;
+      if (Math.abs(m.u - player.u) > m.ru) continue;
+      if (m.hitAt !== undefined && nowMinutes - m.hitAt < 1) continue;
+      if (player.jumpY > 0.9) continue; // 跳び越えた
+
+      m.hitAt = nowMinutes;
+      player.speed = Math.min(player.speed, SPEED.walk);
+      player.stamina = Math.max(0, player.stamina - 3);
+      events.push({ type: 'bump', text: '人にぶつかった。', quiet: true });
+    }
     return events;
   }
 
