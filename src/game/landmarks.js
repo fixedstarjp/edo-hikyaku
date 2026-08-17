@@ -43,6 +43,7 @@ export class Landmarks {
       if (lm.gateway) this._gateway(lm);
       if (lm.moat) this._moat(lm);
       if (lm.keep) this._keep(lm);
+      if (lm.grove) this._grove(lm);
 
       switch (lm.kind) {
         case 'kosatsu':
@@ -52,7 +53,9 @@ export class Landmarks {
           this._okido(lm);
           break;
         case 'slope':
-          this._slope(lm);
+          // 石垣の段を組むのは九段坂のように地形そのものが名の由来である坂だけ。
+          // ただの急坂は、標高が付けてある以上、余計な造作は要らない。
+          if (lm.terraces) this._slope(lm);
           break;
         case 'view':
           if (!lm.moat) this._viewpoint(lm);
@@ -531,8 +534,7 @@ export class Landmarks {
    */
   _slope(lm) {
     const { route, materials } = this;
-    const steps = 9;
-    const span = 220;
+    const { steps = 9, span = 220 } = lm.terraces;
     for (let k = 0; k < steps; k++) {
       const s = lm.s - span / 2 + (span * k) / (steps - 1);
       const half = route.widthAt(s) / 2;
@@ -547,6 +549,33 @@ export class Landmarks {
       cap.position.copy(at.pos).setY(at.pos.y + h - 0.3);
       cap.rotation.y = at.yaw;
       this.group.add(cap);
+    }
+  }
+
+  /**
+   * 木立。
+   * 暗闇坂のように木が繁って昼なお暗い坂や、一本松のような目印の大木に使う。
+   * side が 0 なら両側、±1 ならその側だけ。
+   */
+  _grove(lm) {
+    const { route, materials } = this;
+    const { side = 0, count = 10, spanM = 120, heightM = [8, 13], nearM = [2.5, 7] } = lm.grove;
+    const rng = makeRng(Math.round(lm.s) * 7 + 13);
+
+    for (let k = 0; k < count; k++) {
+      const s = lm.s + (count === 1 ? 0 : rng.range(-spanM / 2, spanM / 2));
+      const half = route.widthAt(s) / 2;
+      const at = this._at(s, (side === 0 ? (rng.chance(0.5) ? -1 : 1) : side) * (half + rng.range(nearM[0], nearM[1])));
+      const h = rng.range(heightM[0], heightM[1]);
+
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(h * 0.035, h * 0.055, h, 7), materials.wood);
+      trunk.position.copy(at.pos).setY(at.pos.y + h / 2);
+      this.group.add(trunk);
+
+      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(h * rng.range(0.34, 0.46), 1), materials.tree);
+      crown.position.copy(at.pos).setY(at.pos.y + h * 0.92);
+      crown.scale.y = 0.78;
+      this.group.add(crown);
     }
   }
 

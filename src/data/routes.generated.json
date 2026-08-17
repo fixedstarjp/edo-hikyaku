@@ -94,7 +94,7 @@
       "name": "赤坂御門 → 三軒茶屋",
       "from": "赤坂御門",
       "to": "三軒茶屋",
-      "summary": "五街道ではないが、江戸の庶民がいちばん多く歩いた行楽の道。相模の大山へ詣でる道筋で、青山の台地を西へ行き、渋谷の谷へ下って道玄坂を登り返す。",
+      "summary": "五街道ではない、江戸の庶民がいちばん多く歩いた行楽の道。青山の台地から渋谷の谷へ下り、道玄坂を登り返す。",
       "totalLength": 7501,
       "historicalDistance": {
         "ri": 2,
@@ -105,6 +105,26 @@
         "minElevation": 13.32,
         "maxElevation": 35.25,
         "maxGradePermil": 82.5
+      }
+    },
+    {
+      "id": "azabu-01",
+      "road": "麻布 坂めぐり",
+      "stage": 1,
+      "order": 6,
+      "name": "飯倉 → 六本木",
+      "from": "飯倉",
+      "to": "六本木",
+      "summary": "街道ではない。麻布は武家地と寺町の入り組んだ坂の町。町飛脚となって、古川の谷へ下り台地へ上り返す。",
+      "totalLength": 2237.9,
+      "historicalDistance": {
+        "km": 2.4,
+        "source": "街道ではないので里程の定めは無い。麻布の坂を辿った道筋を組んだもの"
+      },
+      "stats": {
+        "minElevation": 4.56,
+        "maxElevation": 30.36,
+        "maxGradePermil": 123.7
       }
     }
   ]

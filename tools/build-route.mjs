@@ -31,10 +31,14 @@ const STEP_M = 15;
  * 標高の平滑化。
  * 都市部の DEM は掘割・高架・再開発の造成を拾うため、数十 m 幅のスパイクが出る。
  * まず中央値フィルタでスパイクを落とし、次に移動平均でならす。
- * 峠のような本物の坂は数百 m 以上続くので、この窓幅なら消えない。
+ *
+ * 窓幅は「消したいスパイクより広く、残したい起伏より狭く」なければならない。
+ * 街道の峠は数百 m 続くので既定の 225m でよいが、麻布のように 150m ごとに
+ * 谷と台地が入れ替わる道では本物の起伏まで平らにしてしまう。
+ * そういう道は route の smoothWindowM で狭められるようにしてある。
  */
-const MEDIAN_WINDOW = 5; // 75m
-const SMOOTH_WINDOW = 15; // 225m
+const DEFAULT_MEDIAN_M = 75;
+const DEFAULT_SMOOTH_M = 225;
 
 const R_EARTH = 6378137;
 const DEG = Math.PI / 180;
@@ -198,7 +202,15 @@ async function buildRoute(file) {
   }
   console.log(` 完了`);
 
-  const elev = movingAverage(medianFilter(rawElev, MEDIAN_WINDOW), SMOOTH_WINDOW);
+  // 窓幅は m 指定を点数へ直す。必ず奇数にして中心を揃える。
+  const toOdd = (m) => {
+    const n = Math.max(1, Math.round(m / STEP_M));
+    return n % 2 === 1 ? n : n + 1;
+  };
+  const medianWindow = toOdd(route.medianWindowM ?? DEFAULT_MEDIAN_M);
+  const smoothWindow = toOdd(route.smoothWindowM ?? DEFAULT_SMOOTH_M);
+
+  const elev = movingAverage(medianFilter(rawElev, medianWindow), smoothWindow);
 
   // 現代の地形が江戸期と大きく異なる箇所への手動補正。
   // 切通し・埋立・造成で失われた起伏を、根拠を明記したうえで戻す。
@@ -286,8 +298,8 @@ async function buildRoute(file) {
       note: route.note,
       generatedAt: new Date().toISOString().slice(0, 10),
       stepM: STEP_M,
-      medianWindow: MEDIAN_WINDOW,
-      smoothWindow: SMOOTH_WINDOW,
+      medianWindow,
+      smoothWindow,
       elevationSource: [...sources],
       elevationOverrides: route.elevationOverrides ?? [],
       attribution: '標高: 国土地理院 標高タイル',

@@ -479,6 +479,14 @@ let hudTimer = 0;
 
 /* ------------------------------------------------------------ 画面 */
 
+/** 里程を漢数字で。二里十丁のように読ませる。 */
+function kanjiNum(n) {
+  const D = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  if (n < 10) return D[n];
+  if (n < 20) return `十${n % 10 ? D[n % 10] : ''}`;
+  return `${D[Math.floor(n / 10)]}十${n % 10 ? D[n % 10] : ''}`;
+}
+
 function fmtMinutes(m) {
   const h = Math.floor(m / 60);
   const mm = Math.round(m % 60);
@@ -540,7 +548,6 @@ function renderStageList() {
       <button class="stage-card${r.id === selectedId ? ' on' : ''}" data-id="${r.id}">
         <span class="stage-road">${r.road}</span>
         <span class="stage-name">${r.from} — ${r.to}</span>
-        <span class="stage-figures">${(r.totalLength / 1000).toFixed(2)} km ／ 標高 ${r.stats.minElevation}–${r.stats.maxElevation} m</span>
       </button>`
     )
     .join('');
@@ -554,13 +561,25 @@ async function selectStage(id) {
   selectedId = id;
   renderStageList();
   const r = manifest.routes.find((x) => x.id === id);
-  brief.innerHTML = `${r.summary}<br>実延長 <b>${(r.totalLength / 1000).toFixed(2)} km</b>（史料の${r.historicalDistance.ri === 2 ? '二里' : `${r.historicalDistance.ri}里`} = ${r.historicalDistance.km} km）　最急 <b>${r.stats.maxGradePermil} ‰</b>`;
+  // 街道なら史料の里程と並べる。里程の定めが無い道は実測だけを出す。
+  const hd = r.historicalDistance ?? {};
+  const ri = hd.ri ? `${kanjiNum(hd.ri)}里${hd.cho ? `${kanjiNum(hd.cho)}丁` : ''}` : null;
+  const dist = ri
+    ? `実延長 <b>${(r.totalLength / 1000).toFixed(2)} km</b>（史料の${ri} = ${hd.km} km）`
+    : `実延長 <b>${(r.totalLength / 1000).toFixed(2)} km</b>（里程の定めは無い道）`;
+  brief.innerHTML = `${r.summary}<br>${dist}　最急 <b>${r.stats.maxGradePermil} ‰</b>`;
 
   startButton.disabled = true;
   startButton.textContent = '支度中…';
   await buildStage(id);
-  const grace = (stage.route.gate?.closesAtMinutes ?? 0) - stage.route.startTimeMinutes;
-  brief.innerHTML += `<br>暮六つに <b>${stage.gateLandmark?.name ?? '大木戸'}</b> が閉じる。出立はその ${grace} 分前。`;
+  // 大木戸は門が閉まる。宿場や町は閉まらないので、刻限として言う。
+  const gate = stage.route.gate;
+  const grace = (gate?.closesAtMinutes ?? 0) - stage.route.startTimeMinutes;
+  const name = stage.gateLandmark?.name ?? '大木戸';
+  brief.innerHTML +=
+    gate?.kind === 'keijitsu'
+      ? `<br>暮六つが <b>${name}</b> までの刻限。出立はその ${grace} 分前。`
+      : `<br>暮六つに <b>${name}</b> が閉じる。出立はその ${grace} 分前。`;
   startButton.textContent = '出立';
   startButton.disabled = false;
 }
@@ -575,8 +594,6 @@ async function boot() {
   if (COARSE) {
     document.getElementById('title-keys').hidden = true;
     document.getElementById('title-keys-touch').hidden = false;
-    document.getElementById('title-hint').textContent =
-      '画面をなぞれば横を向ける。海や城が見える。';
   }
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}maps/index.json`);

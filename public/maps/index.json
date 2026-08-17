@@ -1,4 +1,19 @@
 {
+  "azabu-01": {
+    "id": "azabu-01",
+    "image": "maps/azabu-01.png",
+    "zoom": 15,
+    "tileSize": 256,
+    "originPx": {
+      "x": 7450118,
+      "y": 3303651
+    },
+    "size": {
+      "w": 588,
+      "h": 486
+    },
+    "attribution": "地理院タイル"
+  },
   "koshu-01": {
     "id": "koshu-01",
     "image": "maps/koshu-01.png",
