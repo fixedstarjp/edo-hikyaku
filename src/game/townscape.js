@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PALETTE } from '../core/palette.js';
 import { makeRng } from '../core/rng.js';
 import { WORLD_SEED } from '../core/config.js';
-import { mergeGeometries, roofPrism } from '../core/geometry.js';
+import { mergeGeometries, roofPrism, groundedBox } from '../core/geometry.js';
 
 /**
  * 沿道の町並み。
@@ -23,7 +23,10 @@ export function buildTownscape(route, materials) {
   const rng = makeRng(WORLD_SEED);
   const group = new THREE.Group();
 
-  const parts = { bodies: [], roofs: [], eaves: [], fronts: [], norens: [], pines: [] };
+  const parts = {
+    bodies: [], roofs: [], eaves: [], fronts: [], norens: [], pines: [],
+    torii: [], shrines: [], yagura: [], stalls: [], stallRoofs: [], kura: [],
+  };
   const sample = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
   const clearZones = keepClearZones(route);
   const blocked = (s, side) =>
@@ -61,6 +64,25 @@ export function buildTownscape(route, materials) {
               ? { storeys: 2, width: [4, 7], depth: [7, 11], shop: true }
               : { storeys: sec.storeys, width: [3.4, 6.4], depth: [6, 11], shop: true };
 
+        // 土蔵は町家の代わりに建てる。道に面していないと白い壁が見えない。
+        if ((sec.kind === 'machiya' || sec.kind === 'shuku') && rng.chance(0.09)) {
+          const w = rng.range(5, 7);
+          const d = rng.range(5, 7);
+          const kh = rng.range(4.5, 6);
+          const yaw = Math.atan2(-sample.tangent.z, sample.tangent.x);
+          const u = side * (half + rng.range(0.6, 1.4) + d / 2);
+          parts.kura.push({
+            pos: new THREE.Vector3(
+              sample.pos.x + sample.left.x * u,
+              sample.pos.y - 0.1,
+              sample.pos.z + sample.left.z * u
+            ),
+            yaw,
+            scale: new THREE.Vector3(w, kh, d),
+          });
+          continue;
+        }
+
         const built = addBuilding(parts, sample, side, half, rng, spec);
 
         // 裏手にもう一列。通りの切れ目から野が見えるのを防ぐ。
@@ -81,6 +103,8 @@ export function buildTownscape(route, materials) {
     }
   }
 
+  addRoadside(parts, route, rng);
+
   group.add(instanced(bodyGeometry(), materials.building, parts.bodies));
   group.add(instanced(roofPrism(), materials.roof, parts.roofs));
   group.add(instanced(bodyGeometry(), materials.eaves, parts.eaves));
@@ -90,7 +114,80 @@ export function buildTownscape(route, materials) {
     group.add(instanced(pineTrunkGeometry(), materials.wood, parts.pines.map((p) => p.trunk)));
     group.add(instanced(pineFoliageGeometry(), materials.foliage, parts.pines.map((p) => p.foliage)));
   }
+
+  group.add(instanced(toriiGeometry(), materials.bengara, parts.torii));
+  group.add(instanced(shrineGeometry(), materials.wood, parts.shrines));
+  group.add(instanced(yaguraGeometry(), materials.wood, parts.yagura));
+  group.add(instanced(stallGeometry(), materials.wood, parts.stalls));
+  group.add(instanced(bodyGeometry(), materials.thatch, parts.stallRoofs));
+  group.add(instanced(kuraGeometry(), materials.plaster, parts.kura));
   return group;
+}
+
+/**
+ * 沿道の作り。
+ *
+ * 町家が並ぶだけでは左右が単調になる。江戸の往来にあったもののうち、
+ * 遠くからでも目に付いて、形で分かるものを撒く。
+ *
+ *   稲荷の祠 … 「伊勢屋 稲荷に 犬の糞」と言われたほど江戸中にあった
+ *   火の見櫓 … 町ごとに立てられた望楼。町並みの上に頭を出す
+ *   屋台   … 蕎麦・天ぷら・鮨。町なかの道端に出る
+ *   土蔵   … 白漆喰に黒い腰。火事の多い江戸で財を守った
+ */
+function addRoadside(parts, route, rng) {
+  const sample = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
+  const kindAt = (s) => route.sections.find((sec) => s >= sec.from && s < sec.to)?.kind ?? 'machiya';
+
+  // 町家は道にぴたりと面するので、道端の物は店先より手前へ出さないと埋まる。
+  // 路肩ぎりぎり（飛脚の寄れる幅の外）に置けば、当たらずに見える。
+  const place = (s, side, out, scale, lift = 0, near = [-0.1, 0.4]) => {
+    route.sample(s, 0, sample);
+    const half = route.widthAt(s) / 2;
+    const u = side * (half + rng.range(near[0], near[1]));
+    out.push({
+      pos: new THREE.Vector3(
+        sample.pos.x + sample.left.x * u,
+        sample.pos.y - 0.1 + lift,
+        sample.pos.z + sample.left.z * u
+      ),
+      yaw: Math.atan2(-sample.tangent.z, sample.tangent.x),
+      scale,
+    });
+  };
+
+  const clear = (s) => route.landmarks.some((lm) => Math.abs(lm.s - s) < 24);
+
+  for (let s = 60; s < route.length - 60; s += rng.range(28, 70)) {
+    if (clear(s)) continue;
+    const kind = kindAt(s);
+    const town = kind === 'machiya' || kind === 'shuku';
+    const side = rng.chance(0.5) ? -1 : 1;
+
+    // 稲荷の祠。鳥居と小さな社。どこにでもある。
+    if (rng.chance(town ? 0.34 : 0.18)) {
+      const k = rng.range(1, 1.35);
+      place(s, side, parts.torii, new THREE.Vector3(k, k, k));
+      // 祠は鳥居の奥。道からの距離で下げる。
+      place(s, side, parts.shrines, new THREE.Vector3(k, k, k), 0, [2.1, 2.6]);
+      continue;
+    }
+
+    // 屋台。町なかの道端に出る。
+    if (town && rng.chance(0.26)) {
+      const w = rng.range(1.6, 2.2);
+      place(s, side, parts.stalls, new THREE.Vector3(w, 1.5, 1.1), 0, [0, 0.5]);
+      place(s, side, parts.stallRoofs, new THREE.Vector3(w * 1.25, 0.14, 1.5), 1.95, [0, 0.5]);
+      continue;
+    }
+
+    // 火の見櫓。数は少なくてよい。町家の屋根の上に頭を出すのが役目なので、
+    // 一列うしろに立てて丈で見せる。
+    if (town && rng.chance(0.08)) {
+      const h = rng.range(10, 14);
+      place(s, side, parts.yagura, new THREE.Vector3(1, h, 1), 0, [7, 11]);
+    }
+  }
 }
 
 /**
@@ -248,6 +345,77 @@ function pineFoliageGeometry() {
     parts.push(c);
   }
   return mergeGeometries(parts);
+}
+
+/** 稲荷の鳥居。柱二本に笠木と島木、貫を一本。 */
+function toriiGeometry() {
+  return mergeGeometries([
+    groundedBox(0.16, 2.1, 0.16, -0.75, 0, 0),
+    groundedBox(0.16, 2.1, 0.16, 0.75, 0, 0),
+    groundedBox(2.1, 0.14, 0.22, 0, 1.94, 0), // 島木
+    groundedBox(2.35, 0.13, 0.3, 0, 2.08, 0), // 笠木
+    groundedBox(1.75, 0.11, 0.16, 0, 1.5, 0), // 貫
+  ]);
+}
+
+/** 祠。切妻の小さな社。 */
+function shrineGeometry() {
+  const roof = roofPrism();
+  roof.scale(1.5, 0.5, 1.4);
+  roof.translate(0, 1.05, 0);
+  return mergeGeometries([
+    groundedBox(1.2, 0.25, 1.1, 0, 0, 0), // 台
+    groundedBox(0.95, 0.85, 0.85, 0, 0.25, 0), // 身舎
+    roof,
+  ]);
+}
+
+/** 火の見櫓。四本の柱を筋交いで組み、上に望楼と半鐘。 */
+function yaguraGeometry() {
+  const parts = [];
+  for (const [x, z] of [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]) {
+    parts.push(groundedBox(0.13, 1, 0.13, x, 0, z));
+  }
+  for (const y of [0.3, 0.6]) {
+    parts.push(groundedBox(1.2, 0.07, 0.1, 0, y, -0.5));
+    parts.push(groundedBox(1.2, 0.07, 0.1, 0, y, 0.5));
+    parts.push(groundedBox(0.1, 0.07, 1.2, -0.5, y, 0));
+    parts.push(groundedBox(0.1, 0.07, 1.2, 0.5, y, 0));
+  }
+  parts.push(groundedBox(1.7, 0.09, 1.7, 0, 0.9, 0)); // 望楼の床
+  parts.push(groundedBox(1.5, 0.12, 0.1, 0, 0.99, -0.75)); // 手すり
+  parts.push(groundedBox(1.5, 0.12, 0.1, 0, 0.99, 0.75));
+  const roof = roofPrism();
+  roof.scale(1.9, 0.22, 1.9);
+  roof.translate(0, 1.12, 0);
+  parts.push(roof);
+  return mergeGeometries(parts);
+}
+
+/** 屋台。担いで運ぶ台に、脚と品を載せた棚。 */
+function stallGeometry() {
+  return mergeGeometries([
+    groundedBox(1, 0.12, 1, 0, 0.62, 0), // 天板
+    groundedBox(0.9, 0.28, 0.8, 0, 0.3, 0), // 箱
+    groundedBox(0.1, 0.62, 0.1, -0.42, 0, -0.36),
+    groundedBox(0.1, 0.62, 0.1, 0.42, 0, -0.36),
+    groundedBox(0.1, 0.62, 0.1, -0.42, 0, 0.36),
+    groundedBox(0.1, 0.62, 0.1, 0.42, 0, 0.36),
+    groundedBox(0.07, 0.6, 0.07, -0.45, 0.74, 0), // 屋根を支える柱
+    groundedBox(0.07, 0.6, 0.07, 0.45, 0.74, 0),
+  ]);
+}
+
+/** 土蔵。白漆喰の壁に黒い腰、重い瓦屋根。 */
+function kuraGeometry() {
+  const roof = roofPrism();
+  roof.scale(1.16, 0.28, 1.14);
+  roof.translate(0, 1, 0);
+  return mergeGeometries([
+    groundedBox(1, 1, 1, 0, 0, 0),
+    groundedBox(1.04, 0.22, 1.04, 0, 0, 0), // 腰
+    roof,
+  ]);
 }
 
 /* ------------------------------------------------------------ 実体化 */

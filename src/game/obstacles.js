@@ -33,10 +33,14 @@ export class Crowd {
     this.rng = rng;
 
     this.statics = []; // 立ち話や店先。位置は動かない
-    this.movers = []; // 街道を歩いている者。毎コマ動く
+    this.movers = []; // 街道を歩いている者。進行方向に沿って動く
+    this.crossers = []; // 道を横切る者。飛脚の行く手を実際に塞ぐ
+    this.dogs = []; // 野良犬。速く、気まぐれに飛び出す
+    this.rollers = []; // 駕籠。道幅を塞いで進む
     this.processions = [];
 
     this._spawnTownsfolk(rng);
+    this._spawnHazards(rng);
     this._spawnProcessions(rng);
     this._buildMeshes();
 
@@ -51,6 +55,10 @@ export class Crowd {
     }
     this._writeMovers();
     for (const o of this.statics) o.hitAt = undefined;
+    for (const list of [this.crossers, this.dogs, this.rollers]) {
+      for (const o of list) o.hitAt = undefined;
+    }
+    for (const k of this.rollers) k.s = k.baseS;
 
     for (const p of this.processions) {
       p.center = p.baseCenter;
@@ -132,6 +140,81 @@ export class Crowd {
     }
   }
 
+  /**
+   * 行く手を塞ぐもの。
+   *
+   * 街道に沿って歩く者は、こちらと同じ向きに動くので障害にならない。
+   * 実際に避けさせるには、道を横切るものと、道幅を塞いで進むものが要る。
+   */
+  _spawnHazards(rng) {
+    const { route } = this;
+
+    for (let s = 120; s < route.length - 120; s += rng.range(50, 190)) {
+      const kind = this._sectionKind(s);
+      const half = route.widthAt(s) / 2;
+      const edge = half - 0.5;
+
+      // 野良犬。町なかほど多い。端で待っては、ひょいと横切る。
+      const dogChance = kind === 'machiya' || kind === 'shuku' ? 0.55 : 0.32;
+      if (rng.chance(dogChance)) {
+        const dir = rng.chance(0.5) ? 1 : -1;
+        this.dogs.push({
+          s: s + rng.range(-20, 20),
+          u: dir > 0 ? -edge : edge,
+          uMin: -edge,
+          uMax: edge,
+          dir,
+          speed: rng.range(2.2, 3.8),
+          wait: rng.range(0, 6),
+          waitRange: [1.5, 7],
+          // 半分ほどは、こちらが近づくと飛び出す気まぐれ者
+          darts: rng.chance(0.55),
+          phase: rng() * 6.28,
+          rs: 0.9,
+          ru: 0.62,
+          scaleV: new THREE.Vector3(1, 1, 1).multiplyScalar(rng.range(0.85, 1.15)),
+          color: new THREE.Color(rng.pick([0x6b5b47, 0x8a7a63, 0x4a423a, 0x9c8f78])),
+        });
+      }
+
+      // 道を横切る町人。犬より遅いぶん、居座る時間が長い。
+      if (rng.chance(kind === 'machiya' || kind === 'shuku' ? 0.34 : 0.16)) {
+        const dir = rng.chance(0.5) ? 1 : -1;
+        this.crossers.push({
+          s: s + rng.range(-25, 25),
+          u: dir > 0 ? -edge : edge,
+          uMin: -edge,
+          uMax: edge,
+          dir,
+          speed: rng.range(0.7, 1.3),
+          wait: rng.range(0, 9),
+          waitRange: [2, 10],
+          phase: rng() * 6.28,
+          rs: 1.0,
+          ru: 0.62,
+          scaleV: new THREE.Vector3(1, 1, 1).multiplyScalar(rng.range(0.92, 1.08)),
+          color: new THREE.Color(TOWNSFOLK_COLORS[rng.int(0, TOWNSFOLK_COLORS.length - 1)]),
+        });
+      }
+
+      // 駕籠。道の真ん中を塞いで進むので、端へ寄らないと抜けない。
+      if (half > 3.4 && rng.chance(0.16)) {
+        this.rollers.push({
+          baseS: s,
+          s,
+          u: rng.range(-half * 0.35, half * 0.35),
+          dir: rng.chance(0.5) ? 1 : -1,
+          speed: rng.range(1.1, 1.6),
+          phase: rng() * 6.28,
+          rs: 2.2,
+          ru: 1.35,
+          scaleV: new THREE.Vector3(1, 1, 1),
+          color: new THREE.Color(rng.pick([0x3a3630, 0x4a423a, 0x2f2b26])),
+        });
+      }
+    }
+  }
+
   _spawnProcessions(rng) {
     for (const spec of this.route.processions) {
       const half = this.route.widthAt(spec.center) / 2;
@@ -196,6 +279,11 @@ export class Crowd {
     this.group.add(this.moverMesh);
     this._writeMovers();
 
+    // 行く手を塞ぐもの。それぞれ形が違うので別の束にする。
+    this.crosserMesh = this._makeGroup(this.personGeo, materials.cloth, this.crossers);
+    this.dogMesh = this._makeGroup(dogGeometry(), materials.cloth, this.dogs);
+    this.kagoMesh = this._makeGroup(kagoGeometry(), materials.cloth, this.rollers);
+
     this.cartMesh = instanced(this.cartGeo, materials.wood, carts.map((o) => this._itemFor(o)));
     this.group.add(this.cartMesh);
 
@@ -246,6 +334,62 @@ export class Crowd {
     }
   }
 
+  /** 同じ形のものをひと束の InstancedMesh にして、色だけ先に入れておく。 */
+  _makeGroup(geometry, material, items) {
+    const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, items.length));
+    mesh.frustumCulled = false;
+    mesh.count = items.length;
+    items.forEach((it, i) => {
+      it.index = i;
+      mesh.setColorAt(i, it.color);
+    });
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    this.group.add(mesh);
+    return mesh;
+  }
+
+  /**
+   * 道を横切るもの。端で待っては反対側へ渡り、また待つ。
+   * 待ち時間があるので、通りかかるたび居場所が違う。
+   */
+  _stepCrossers(list, mesh, dtGame, playerS, bob) {
+    let wrote = false;
+    for (const c of list) {
+      // 端で待っている犬は、飛脚が近づいたところで飛び出す。
+      // 出任せの間合いだと滅多にぶつからず、犬が居るだけになってしまう。
+      if (c.darts && c.wait > 0) {
+        const ahead = c.s - playerS;
+        if (ahead > 0 && ahead < 30) c.wait = 0;
+      }
+
+      if (c.wait > 0) c.wait -= dtGame;
+      else {
+        c.u += c.dir * c.speed * dtGame;
+        if (c.u >= c.uMax) {
+          c.u = c.uMax;
+          c.dir = -1;
+          c.wait = c.waitRange[0] + Math.random() * (c.waitRange[1] - c.waitRange[0]);
+        } else if (c.u <= c.uMin) {
+          c.u = c.uMin;
+          c.dir = 1;
+          c.wait = c.waitRange[0] + Math.random() * (c.waitRange[1] - c.waitRange[0]);
+        }
+      }
+      if (Math.abs(c.s - playerS) > 260) continue;
+
+      c.phase += dtGame * c.speed * 3;
+      const sm = this.route.sample(c.s, c.u, _sample);
+      // 横切る向きへ体を向ける
+      _q.setFromAxisAngle(_up, Math.atan2(-sm.tangent.z, sm.tangent.x) + (c.dir > 0 ? Math.PI / 2 : -Math.PI / 2));
+      _v.copy(sm.pos);
+      if (c.wait <= 0) _v.y += Math.abs(Math.sin(c.phase)) * bob;
+      _m.compose(_v, _q, c.scaleV);
+      mesh.setMatrixAt(c.index, _m);
+      wrote = true;
+    }
+    if (wrote) mesh.instanceMatrix.needsUpdate = true;
+  }
+
   /** 歩いている者を今の位置へ置く。near を渡すとその近くだけ書き換える。 */
   _writeMovers(near = null) {
     for (const m of this.movers) {
@@ -272,6 +416,26 @@ export class Crowd {
     }
     this._writeMovers(player.s);
 
+    // 道を横切るものと、道幅を塞いで進む駕籠
+    this._stepCrossers(this.crossers, this.crosserMesh, dtGame, player.s, 0.05);
+    this._stepCrossers(this.dogs, this.dogMesh, dtGame, player.s, 0.07);
+
+    let rolled = false;
+    for (const k of this.rollers) {
+      k.s += k.dir * k.speed * dtGame;
+      if (k.s < 40 || k.s > this.route.length - 40) k.dir *= -1;
+      if (Math.abs(k.s - player.s) > 300) continue;
+      k.phase += dtGame * 4;
+      const sm = this.route.sample(k.s, k.u, _sample);
+      _q.setFromAxisAngle(_up, Math.atan2(-sm.tangent.z, sm.tangent.x) + (k.dir > 0 ? 0 : Math.PI));
+      _v.copy(sm.pos);
+      _v.y += Math.sin(k.phase) * 0.045; // 舁き棒の揺れ
+      _m.compose(_v, _q, k.scaleV);
+      this.kagoMesh.setMatrixAt(k.index, _m);
+      rolled = true;
+    }
+    if (rolled) this.kagoMesh.instanceMatrix.needsUpdate = true;
+
     // 遠い行列は動かさないし、行列も書き換えない。
     // 位置は最後に書いたままで正しいので、近づいてから書き直せば足りる。
     let moved = false;
@@ -286,6 +450,38 @@ export class Crowd {
     events.push(...this._checkProcession(player, nowMinutes));
     events.push(...this._checkStatics(player, nowMinutes));
     events.push(...this._checkMovers(player, nowMinutes));
+    events.push(...this._checkHit(this.dogs, player, nowMinutes, {
+      text: '野良犬が足元へ飛び出した。',
+      speed: SPEED.walk * 0.55,
+      stamina: 5,
+    }));
+    events.push(...this._checkHit(this.crossers, player, nowMinutes, {
+      text: '道を横切る人にぶつかった。',
+      speed: SPEED.walk * 0.7,
+      stamina: 4,
+    }));
+    events.push(...this._checkHit(this.rollers, player, nowMinutes, {
+      text: '駕籠に道を塞がれた。',
+      speed: SPEED.walk * 0.35,
+      stamina: 6,
+    }));
+    return events;
+  }
+
+  /** 動くものとの衝突。位置が動くので並べ替えは効かず、素直に舐める。 */
+  _checkHit(list, player, nowMinutes, effect) {
+    const events = [];
+    for (const o of list) {
+      if (Math.abs(o.s - player.s) > o.rs) continue;
+      if (Math.abs(o.u - player.u) > o.ru) continue;
+      if (o.hitAt !== undefined && nowMinutes - o.hitAt < 1) continue;
+      if (player.jumpY > 0.9) continue; // 跳び越えた
+
+      o.hitAt = nowMinutes;
+      player.speed = Math.min(player.speed, effect.speed);
+      player.stamina = Math.max(0, player.stamina - effect.stamina);
+      events.push({ type: 'bump', text: effect.text, quiet: true });
+    }
     return events;
   }
 
@@ -397,6 +593,30 @@ function spearmanGeometry() {
     groundedBox(0.26, 0.2, 0.24, 0, 1.32, 0), // 笠
     groundedBox(0.42, 0.06, 0.42, 0, 1.5, 0), // 笠のつば
     groundedBox(0.07, 2.2, 0.07, 0.3, 0.2, 0), // 槍
+  ]);
+}
+
+/** 野良犬。江戸の町には犬が多く、往来を平気で横切った。 */
+function dogGeometry() {
+  return mergeGeometries([
+    groundedBox(0.28, 0.3, 0.78, 0, 0.3, 0), // 胴
+    groundedBox(0.22, 0.24, 0.26, 0, 0.46, 0.46), // 頭
+    groundedBox(0.08, 0.32, 0.08, 0.09, 0, 0.28), // 脚
+    groundedBox(0.08, 0.32, 0.08, -0.09, 0, 0.28),
+    groundedBox(0.08, 0.32, 0.08, 0.09, 0, -0.28),
+    groundedBox(0.08, 0.32, 0.08, -0.09, 0, -0.28),
+    groundedBox(0.07, 0.07, 0.3, 0, 0.52, -0.5), // 尾
+  ]);
+}
+
+/** 駕籠。舁き手が二人。道幅を塞ぐので追い越すには端へ寄るしかない。 */
+function kagoGeometry() {
+  return mergeGeometries([
+    groundedBox(0.95, 0.8, 1.15, 0, 0.85, 0), // 胴
+    groundedBox(1.15, 0.16, 1.35, 0, 1.65, 0), // 屋根
+    groundedBox(0.09, 0.09, 3.6, 0, 1.78, 0), // 舁き棒
+    groundedBox(0.42, 1.5, 0.26, 0, 0, 1.5), // 前の舁き手
+    groundedBox(0.42, 1.5, 0.26, 0, 0, -1.5), // 後の舁き手
   ]);
 }
 
