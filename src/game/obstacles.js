@@ -326,8 +326,10 @@ export class Crowd {
       const clearance = half * 0.5 + 0.9;
 
       if (player.speed > SPEED.walk * 1.45 && !p.scolded) {
+        // ゲーム内の分。時間圧縮が三倍なので、実際に待つのは四十秒ほど。
+        // これ以上長くすると、ただ立たされるだけの間が退屈になる。
         p.scolded = true;
-        player.stun(nowMinutes, 3);
+        player.stun(nowMinutes, 2);
         events.push({
           type: 'rude',
           title: '無礼者',

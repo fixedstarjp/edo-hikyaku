@@ -331,6 +331,52 @@ body {
   opacity: 0;
 }
 
+/* ------------------------------------------------------- 足止めの札 */
+
+/* 咎めを受けているあいだ、あと何秒で動けるかを見せる。
+   待たされる理由と終わりが分かれば、止められても腹が立ちにくい。 */
+#stun {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 26px;
+  background: rgba(58, 22, 16, 0.82);
+  border: 1px solid var(--bengara);
+  border-radius: 3px;
+  backdrop-filter: blur(3px);
+}
+
+#stun[hidden] {
+  display: none;
+}
+
+.stun-label {
+  font-family: var(--mincho);
+  font-size: 19px;
+  letter-spacing: 0.14em;
+  opacity: 0.85;
+}
+
+.stun-count {
+  font-family: var(--mincho);
+  font-size: 42px;
+  line-height: 1;
+  color: #f0956d;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.2em;
+  text-align: right;
+}
+
+.stun-unit {
+  font-family: var(--mincho);
+  font-size: 17px;
+  opacity: 0.75;
+}
+
 /* --------------------------------------------------------- 名所の札 */
 
 /* 名所の札。読ませるものなので、視界を塞がない左下に置いて左揃えにする。 */
@@ -470,9 +516,10 @@ body {
   margin: -10px 0 16px;
 }
 
+/* 街道が増えたので三列。縦に伸ばすと「出立」が画面から出てしまう。 */
 .stage-list {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -519,7 +566,11 @@ body {
 }
 
 .title-inner {
-  max-width: 640px;
+  max-width: 700px;
+}
+
+.stage-road {
+  white-space: normal;
 }
 
 .result-buttons {

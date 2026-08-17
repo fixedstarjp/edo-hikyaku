@@ -1,4 +1,4 @@
-import { STAMINA } from '../core/config.js';
+import { STAMINA, TIME_SCALE } from '../core/config.js';
 
 /** 画面表示。3D の外側、ふつうの DOM で組む。 */
 export class Hud {
@@ -20,6 +20,8 @@ export class Hud {
       grade: document.getElementById('grade'),
       elevation: document.getElementById('elevation'),
       toast: document.getElementById('toast'),
+      stun: document.getElementById('stun'),
+      stunCount: document.getElementById('stun-count'),
       banner: document.getElementById('banner'),
       bannerName: document.getElementById('banner-name'),
       bannerKana: document.getElementById('banner-kana'),
@@ -93,6 +95,15 @@ export class Hud {
       el.deadline.classList.toggle('closed', gateClosed);
     } else {
       el.deadline.hidden = true;
+    }
+
+    // 足止めの残り。ゲーム内の分ではなく、実際に待つ秒数で見せる。
+    const leftMinutes = player.stunUntil - clock.minutes;
+    if (leftMinutes > 0) {
+      el.stun.hidden = false;
+      el.stunCount.textContent = Math.ceil((leftMinutes * 60) / TIME_SCALE);
+    } else {
+      el.stun.hidden = true;
     }
 
     const pct = (player.stamina / STAMINA.max) * 100;

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-16",
+  "generatedAt": "2026-08-17",
   "routes": [
     {
       "id": "tokaido-01",
@@ -84,6 +84,27 @@
         "minElevation": 0.7,
         "maxElevation": 4.74,
         "maxGradePermil": 10
+      }
+    },
+    {
+      "id": "oyama-01",
+      "road": "大山道",
+      "stage": 1,
+      "order": 5,
+      "name": "赤坂御門 → 三軒茶屋",
+      "from": "赤坂御門",
+      "to": "三軒茶屋",
+      "summary": "五街道ではないが、江戸の庶民がいちばん多く歩いた行楽の道。相模の大山へ詣でる道筋で、青山の台地を西へ行き、渋谷の谷へ下って道玄坂を登り返す。",
+      "totalLength": 7501,
+      "historicalDistance": {
+        "ri": 2,
+        "km": 7.85,
+        "source": "赤坂御門〜三軒茶屋 およそ二里（大山道の里程は赤坂御門を起点に数える）"
+      },
+      "stats": {
+        "minElevation": 13.32,
+        "maxElevation": 35.25,
+        "maxGradePermil": 82.5
       }
     }
   ]

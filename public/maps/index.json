@@ -44,6 +44,21 @@
     },
     "attribution": "地理院タイル"
   },
+  "oyama-01": {
+    "id": "oyama-01",
+    "image": "maps/oyama-01.png",
+    "zoom": 15,
+    "tileSize": 256,
+    "originPx": {
+      "x": 7448720,
+      "y": 3303154
+    },
+    "size": {
+      "w": 1830,
+      "h": 1302
+    },
+    "attribution": "地理院タイル"
+  },
   "tokaido-01": {
     "id": "tokaido-01",
     "image": "maps/tokaido-01.png",
