@@ -32,17 +32,17 @@
       "from": "品川宿",
       "to": "川崎宿",
       "summary": "品川の問屋場で荷を継ぎ、鈴ヶ森・大森を過ぎて六郷の渡しへ。江戸を離れて在方の街道に入る区間で、終わりに多摩川を舟で越える。",
-      "totalLength": 10049.3,
+      "totalLength": 10589.7,
       "historicalDistance": {
         "ri": 2,
         "cho": 18,
-        "km": 9.8,
-        "source": "東海道宿村大概帳、品川宿〜川崎宿 二里半"
+        "km": 9.82,
+        "source": "東海道宿村大概帳ほか、品川宿〜川崎宿 二里半。ただし品川宿の本陣（北品川三丁目）と川崎宿の本陣（本町一丁目）は直線でも 10.4km 離れており、二里半は宿の中心どうしを道なりに測った値ではありえない。宿はずれどうしで測ったか、半里単位に丸めた名目の里程と見るほかない。実際に歩いた距離を 10km とする案内もある"
       },
       "stats": {
-        "minElevation": 1.68,
-        "maxElevation": 15.97,
-        "maxGradePermil": 54.7
+        "minElevation": 1.49,
+        "maxElevation": 4.32,
+        "maxGradePermil": 12
       },
       "crossings": [
         {
@@ -105,7 +105,7 @@
       "from": "板橋宿",
       "to": "蕨宿",
       "summary": "板橋の問屋場から石神井川を渡り、志村の坂を上って武蔵野の台地へ。一里塚を三つ数え、戸田の渡しで荒川を越えて蕨へ入る。",
-      "totalLength": 9755.5,
+      "totalLength": 10133.5,
       "historicalDistance": {
         "ri": 2,
         "cho": 18,
@@ -113,9 +113,9 @@
         "source": "日本橋〜蕨宿 四里二十八町から、日本橋〜板橋宿 二里十丁を差し引いた値。板橋宿からの距離を二里十丁とする史料もあるが、板橋宿は平尾から上宿まで一里近くあり、どこを起点に取るかで半里ほど変わる"
       },
       "stats": {
-        "minElevation": 1.08,
-        "maxElevation": 28.73,
-        "maxGradePermil": 79.3
+        "minElevation": 1.76,
+        "maxElevation": 28.31,
+        "maxGradePermil": 76.7
       },
       "crossings": [
         {
