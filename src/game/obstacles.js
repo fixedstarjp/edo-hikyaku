@@ -85,6 +85,7 @@ export class Crowd {
     const DENSITY = { machiya: [1, 3], shuku: [1, 3], yashiki: [0, 1], kaido: [0, 1] };
 
     for (let s = 40; s < route.length - 40; s += rng.range(7, 26)) {
+      if (route.crossingDropAt(s) > 0.25) continue; // 渡しは川
       const [lo, hi] = DENSITY[this._sectionKind(s)] ?? [0, 1];
       const count = rng.int(lo, hi);
       const half = route.widthAt(s) / 2;
@@ -150,6 +151,7 @@ export class Crowd {
     const { route } = this;
 
     for (let s = 120; s < route.length - 120; s += rng.range(50, 190)) {
+      if (route.crossingDropAt(s) > 0.25) continue; // 渡しは川
       const kind = this._sectionKind(s);
       const half = route.widthAt(s) / 2;
       const edge = half - 0.5;

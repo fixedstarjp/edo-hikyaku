@@ -480,7 +480,7 @@ body {
   margin: auto;
   text-align: center;
   max-width: 560px;
-  padding: 12px 30px;
+  padding: 8px 30px;
 }
 
 .title-kicker {
@@ -494,7 +494,7 @@ body {
 
 .title-inner h1 {
   font-family: var(--mincho);
-  font-size: 40px;
+  font-size: 34px;
   letter-spacing: 0.24em;
   text-indent: 0.24em;
   margin: 0;
@@ -520,8 +520,8 @@ body {
 .stage-list {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 7px;
+  margin-bottom: 10px;
 }
 
 .stage-card {
@@ -530,7 +530,7 @@ body {
   gap: 2px;
   align-content: start;
   text-align: left;
-  padding: 9px 15px;
+  padding: 7px 13px;
   font-family: var(--gothic);
   font-size: 13px;
   letter-spacing: 0.03em;
@@ -1104,9 +1104,9 @@ button:disabled {
   }
 
   /* 縦持ちの携帯でも巻き取らずに「出立」まで見えるよう、
-     一画面に収まるところまで詰める。 */
+     一画面に収まるところまで詰める。区間が八つになったので二列にした。 */
   .stage-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 5px;
     margin-bottom: 10px;
   }

@@ -1,6 +1,29 @@
 import * as THREE from 'three';
 
 /**
+ * 渡しの高さ関係。路面を 0 とし、下を負で測る。
+ *
+ *   路面          0
+ *   舟の甲板   -1.05   飛脚はここに立つ
+ *   水面       -1.55
+ *   舟の底     -1.60   水面をわずかに割る
+ *   川底       -2.40
+ */
+/** 川底を路面よりどれだけ下げるか (m)。 */
+export const CROSSING_DEPTH = 2.4;
+/** 水面は川底より少し上。 */
+export const CROSSING_WATER = 0.85;
+/** 舟の甲板が路面より低い量 (m)。 */
+export const FERRY_DECK = 1.05;
+/** 舟底の厚み (m)。甲板からこれだけ下が水を割る。 */
+export const FERRY_DRAFT = 0.55;
+/** 船着場で舟へ乗り移るまでの取り付き (m)。 */
+export const FERRY_LANDING = 7;
+
+/** 汀線の表が null を並べている区間の値 (m)。これ以上なら水は見えない。 */
+const NO_WATER = 400;
+
+/**
  * 街道。
  *
  * 位置は「起点からの里程 s (m)」と「横ずれ u (m)」で表す。u は進行方向に対して左が正。
@@ -21,6 +44,8 @@ export class Route {
     this.startTimeMinutes = src.startTimeMinutes;
     this.sections = src.sections ?? [];
     this.processions = src.processions ?? [];
+    /** 渡し。橋の無い川を舟で越える所。near から far までは道が無い。 */
+    this.crossings = src.crossings ?? [];
     this._width = src.width ?? [[0, 10]];
 
     const { s, x, y, z, grade } = src.samples;
@@ -76,9 +101,49 @@ export class Route {
    * 水が見えない区間は霞の外を返す。
    */
   shoreOffsetAt(s) {
-    const NO_WATER = 400;
     if (!this._shore.length) return NO_WATER;
     return Route._lerpTable(this._shore, s, NO_WATER);
+  }
+
+  /**
+   * 里程 s から水が見えるか。
+   * 見えない区間で水面を張ると、内陸に海や川が湧いてしまう。
+   */
+  waterVisibleAt(s) {
+    return this.hasWater && this.shoreOffsetAt(s) < NO_WATER;
+  }
+
+  /**
+   * 渡しに向かって地面を落とす量 (m)。
+   * 岸から水面まで滑らかに繋ぐので、川底が箱形に切り立たない。
+   */
+  crossingDropAt(s) {
+    let drop = 0;
+    for (const c of this.crossings) {
+      const mid = (c.near + c.far) / 2;
+      const reach = (c.far - c.near) / 2 + 80; // 岸の取り付き
+      const d = Math.abs(s - mid);
+      if (d >= reach) continue;
+      const t = 1 - d / reach;
+      drop = Math.max(drop, CROSSING_DEPTH * t * t * (3 - 2 * t));
+    }
+    return drop;
+  }
+
+  /** 里程 s が渡しの水面の上なら、その渡しを返す。陸なら null。 */
+  crossingAt(s) {
+    for (const c of this.crossings) {
+      if (s >= c.near && s <= c.far) return c;
+    }
+    return null;
+  }
+
+  /** これから越える渡し。すでに越えたものは返さない。 */
+  nextCrossing(s) {
+    for (const c of this.crossings) {
+      if (s < c.far) return c;
+    }
+    return null;
   }
 
   /**

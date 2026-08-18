@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { PALETTE } from '../core/palette.js';
 import { makeRng } from '../core/rng.js';
-import { roofPrism } from '../core/geometry.js';
+import { roofPrism, mergeGeometries, groundedBox } from '../core/geometry.js';
+import { FERRY_DECK, FERRY_DRAFT, FERRY_LANDING } from '../core/route.js';
 
 /**
  * 沿道の名所。
@@ -18,21 +19,33 @@ export class Landmarks {
     this.materials = materials;
     this.group = new THREE.Group();
     this.gateDoors = [];
+    /** 渡し船。渡しごとに一艘。乗っているあいだだけ姿を見せる。 */
+    this.ferries = new Map();
 
     this.bridges = route.landmarks
       .filter((lm) => lm.bridge)
       .map((lm) => ({ s: lm.s, radius: lm.bridge.radiusM, rise: lm.bridge.riseM }));
 
     this._build();
+    this._buildFerries();
   }
 
-  /** 里程 s における路面の迫り上がり (m)。 */
+/**
+   * 里程 s における足もとの高さ (m、路面を 0 とする)。
+   *
+   * 橋では迫り上がり、渡しでは舟の甲板まで下がる。
+   * 飛脚もカメラも名所の造作もこれを見て高さを決めるので、
+   * 舟に乗ったときは画ごと水面近くまで下りる。
+   */
   liftAt(s) {
     let lift = 0;
     for (const b of this.bridges) {
       const d = Math.abs(s - b.s);
       if (d >= b.radius) continue;
       lift += b.rise * 0.5 * (1 + Math.cos((d / b.radius) * Math.PI));
+    }
+    for (const c of this.route.crossings) {
+      lift -= FERRY_DECK * rampFactor(s, c);
     }
     return lift;
   }
@@ -59,6 +72,9 @@ export class Landmarks {
           break;
         case 'view':
           if (!lm.moat) this._viewpoint(lm);
+          break;
+        case 'watashi':
+          // 船着場も舟も _buildFerries が組む。ここでは何も足さない。
           break;
         case 'post':
           this._shukuba(lm);
@@ -526,6 +542,64 @@ export class Landmarks {
     for (const d of this.gateDoors) d.visible = closed;
   }
 
+  /* ------------------------------------------------------------ 渡し */
+
+  /**
+   * 渡し場。両岸に船着場の桟橋を組み、渡し船を一艘置く。
+   *
+   * 舟は乗っているあいだだけ姿を見せて、飛脚の足もとへ付いて動く。
+   * 岸で待っているときは向こう岸に舫ってあることにして隠しておく。
+   */
+  _buildFerries() {
+    const { route, materials } = this;
+
+    for (const c of route.crossings) {
+      const half = route.widthAt(c.s) / 2;
+
+      // 両岸の船着場。街道の端から水際まで、板を敷いて下ろす。
+      for (const [s, dir] of [[c.near - FERRY_LANDING / 2, 1], [c.far + FERRY_LANDING / 2, -1]]) {
+        const at = this._at(s, 0);
+        at.pos.y -= FERRY_DECK * 0.4;
+        const deck = this._box(new THREE.Vector3(half * 2, 0.35, FERRY_LANDING + 3), at, materials.deck);
+        deck.rotation.x = dir * 0.055; // 水際へ向かってわずかに下る
+        // 舫杭
+        for (const u of [-half - 0.5, half + 0.5]) {
+          const p = this._at(s, u);
+          p.pos.y -= FERRY_DECK * 0.4;
+          this._box(new THREE.Vector3(0.34, 1.4, 0.34), p, materials.wood);
+        }
+      }
+
+      const boat = new THREE.Group();
+      boat.add(new THREE.Mesh(ferryHullGeometry(), materials.deck));
+      // 船頭の棹。艫に立てて水を突く。
+      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.1, 4.6, 0.1), materials.wood);
+      pole.position.set(2.2, 1.7, 8.2);
+      pole.rotation.z = -0.22;
+      boat.add(pole);
+      boat.visible = false;
+      this.group.add(boat);
+      this.ferries.set(c.at, boat);
+    }
+  }
+
+  /**
+   * 渡し船を里程 s へ置く。s が null なら岸へ引き上げて隠す。
+   * 舟は水面に浮くので、路面ではなく水面の高さに合わせる。
+   */
+  setFerry(name, s) {
+    const boat = this.ferries.get(name);
+    if (!boat) return;
+    if (s === null) {
+      boat.visible = false;
+      return;
+    }
+    const sm = this.route.sample(s, 0);
+    boat.visible = true;
+    boat.position.set(sm.pos.x, sm.pos.y - FERRY_DECK - FERRY_DRAFT, sm.pos.z);
+    boat.rotation.y = Math.atan2(sm.tangent.x, sm.tangent.z);
+  }
+
   /* ------------------------------------------------------------ 坂 */
 
   /**
@@ -588,6 +662,7 @@ export class Landmarks {
 
     for (let k = 0; k < 5; k++) {
       const s = lm.s + rng.range(-60, 60);
+      if (route.crossingDropAt(s) > 0.25) continue; // 渡しの水の上
       const at = this._at(s, -(half + rng.range(3, 9)));
       const h = rng.range(7, 11);
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, h, 7), materials.wood);
@@ -600,6 +675,7 @@ export class Landmarks {
     }
 
     // 立場の掛茶屋
+    if (route.crossingDropAt(lm.s + 30) > 0.25) return;
     const at = this._at(lm.s + 30, -(half + 5));
     this._box(new THREE.Vector3(6, 2.6, 5), { ...at, pos: at.pos.clone().setY(at.pos.y + 1.3) }, materials.plaster);
     const roof = new THREE.Mesh(roofPrism(), materials.thatch);
@@ -643,4 +719,41 @@ export class Landmarks {
     curtain.rotation.y = goal.yaw;
     this.group.add(curtain);
   }
+}
+
+/**
+ * 渡し船の船体。荷も馬も乗せた平底の舟で、
+ * 沖を行く弁才船のような反りも帆も持たない。
+ */
+/**
+ * 渡し船の船体。荷も馬も乗せた平底の舟で、
+ * 沖を行く弁才船のような反りも帆も持たない。
+ *
+ * 舟の中心を前へずらして、飛脚が艫寄りに立つようにしてある。
+ * 真ん中に立たせるとカメラの手前が船底で埋まって、舟に見えない。
+ */
+function ferryHullGeometry() {
+  const w = 5.6;
+  const d = 12;
+  const z = 3.6; // 前へのずらし
+  return mergeGeometries([
+    groundedBox(w, FERRY_DRAFT, d, 0, 0, z),                        // 底
+    groundedBox(0.22, 0.42, d, -w / 2, FERRY_DRAFT, z),             // 舷
+    groundedBox(0.22, 0.42, d, w / 2, FERRY_DRAFT, z),
+    groundedBox(w, 0.42, 0.22, 0, FERRY_DRAFT, z - d / 2),          // 艫
+    groundedBox(w, 0.42, 0.22, 0, FERRY_DRAFT, z + d / 2),          // 舳
+  ]);
+}
+
+/**
+ * 里程 s が渡しの舟に乗っている度合い 0..1。
+ * 船着場のあいだで滑らかに立ち上げて、乗り降りで画が跳ねないようにする。
+ */
+function rampFactor(s, c) {
+  if (s <= c.near - FERRY_LANDING || s >= c.far + FERRY_LANDING) return 0;
+  if (s >= c.near && s <= c.far) return 1;
+  const t = s < c.near
+    ? (s - (c.near - FERRY_LANDING)) / FERRY_LANDING
+    : ((c.far + FERRY_LANDING) - s) / FERRY_LANDING;
+  return t * t * (3 - 2 * t);
 }
