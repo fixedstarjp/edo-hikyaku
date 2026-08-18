@@ -8,9 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "build:route": "node tools/build-route.mjs",
-    "build:map": "node tools/build-map.mjs",
-    "build:data": "npm run build:route && npm run build:map"
+    "build:route": "node tools/build-route.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"
