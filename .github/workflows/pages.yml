@@ -30,8 +30,8 @@ jobs:
 
       - run: npm ci
 
-      # 街道データ (src/data/*.generated.json) と小地図 (public/maps/*.png) は
-      # 生成済みのものを持たせてあるので、ここで国土地理院へ取りに行くことはない。
+      # 街道データ (src/data/*.generated.json) は生成済みのものを持たせてあるので、
+      # ここで国土地理院へ取りに行くことはない。小地図の下敷きだけは実行時に取る。
       - name: 組み立て
         run: npm run build
         env:
