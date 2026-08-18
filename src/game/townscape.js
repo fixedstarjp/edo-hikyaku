@@ -32,6 +32,9 @@ export function buildTownscape(route, materials) {
   const blocked = (s, side) =>
     clearZones.some((z) => s > z.from && s < z.to && (z.side === 0 || z.side === side));
 
+  // 渡しは川。水の上にも河原にも町は無い。
+  const overWater = (s) => route.crossingDropAt(s) > 0.25;
+
   for (const sec of route.sections) {
     const to = Math.min(sec.to, route.length);
     for (let s = sec.from; s < to; s += sec.spacing) {
@@ -42,6 +45,7 @@ export function buildTownscape(route, materials) {
         if (side > 0 && shore < half + 22 && rng.chance(0.85)) continue;
         if (rng.chance(sec.gap)) continue;
         if (blocked(s, side)) continue;
+        if (overWater(s)) continue;
 
         route.sample(s + rng.range(-1.2, 1.2), 0, sample);
 
@@ -160,6 +164,7 @@ function addRoadside(parts, route, rng) {
 
   for (let s = 60; s < route.length - 60; s += rng.range(28, 70)) {
     if (clear(s)) continue;
+    if (route.crossingDropAt(s) > 0.25) continue;
     const kind = kindAt(s);
     const town = kind === 'machiya' || kind === 'shuku';
     const side = rng.chance(0.5) ? -1 : 1;

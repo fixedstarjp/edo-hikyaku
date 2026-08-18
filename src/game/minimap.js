@@ -164,7 +164,8 @@ export class Minimap {
       const x = m.x - ox;
       const y = m.y - oy;
       if (x < -12 || y < -12 || x > SIZE + 12 || y > SIZE + 12) continue;
-      const big = m.kind === 'okido' || m.kind === 'post' || m.kind === 'origin';
+      const big =
+        m.kind === 'okido' || m.kind === 'post' || m.kind === 'origin' || m.kind === 'watashi';
       g.beginPath();
       g.arc(x, y, big ? 4.2 : 2.8, 0, Math.PI * 2);
       g.fillStyle = big ? '#d6564a' : '#efe4cb';

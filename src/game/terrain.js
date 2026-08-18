@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PALETTE } from '../core/palette.js';
+import { CROSSING_DEPTH, CROSSING_WATER } from '../core/route.js';
 import { makeRng } from '../core/rng.js';
 import { mergeGeometries, groundedBox } from '../core/geometry.js';
 import { instanced } from './townscape.js';
@@ -32,6 +33,7 @@ export function buildTerrain(route, materials) {
   group.add(buildGroundSide(route, materials, -1));
   group.add(buildGroundSide(route, materials, +1));
   group.add(buildRoad(route, materials));
+  for (const water of buildCrossings(route, materials)) group.add(water);
   if (route.hasWater) {
     // 川は帯で、海は一枚の広い水面で作る。
     group.add(route.riverWidth ? buildRiver(route, materials) : buildSea(route, materials));
@@ -63,13 +65,21 @@ function buildGroundSide(route, materials, side) {
   for (let i = 0; i < n; i++) {
     const s = route.s[i];
     route.sample(s, 0, sample);
-    const roadY = sample.pos.y;
+    const roadY = sample.pos.y - route.crossingDropAt(s);
     const half = route.widthAt(s) / 2;
     // 路面と少し重ねて隙間を作らない
     const inner = half - 0.3;
 
+    // 水の見えない区間では水の列を陸の端へ畳んでしまう。
+    // 列の数は帯じゅうで揃っていないといけないので、消すのではなく重ねる。
+    const dry = withWater && !route.waterVisibleAt(s);
+
     let spec;
-    if (withWater && river) {
+    if (dry) {
+      const edge = { d: FAR, y: roadY, kind: 'far' };
+      spec = [{ d: inner, y: roadY - 0.12, kind: 'verge' }, { d: 280, y: roadY, kind: 'far' }];
+      while (spec.length < cols) spec.push(edge);
+    } else if (withWater && river) {
       // 川。対岸を立ち上げて向こう岸を見せる。
       // 川が見えない区間では川幅を絞り、干上がった溝が残らないようにする。
       const shore = Math.max(inner + 16, route.shoreOffsetAt(s));
@@ -132,6 +142,50 @@ function buildGroundSide(route, materials, side) {
   return mesh;
 }
 
+/**
+ * 渡しの水面。
+ *
+ * 街道を横切って流れる川。海や沿いの川と違って向こう岸が街道の先にあるので、
+ * 帯ではなく街道を跨ぐ一枚の板で張る。
+ */
+function buildCrossings(route, materials) {
+  const out = [];
+  const sample = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
+
+  for (const c of route.crossings) {
+    const rows = [];
+    for (let s = c.near - 6; s <= c.far + 6; s += 12) rows.push(Math.min(s, route.length));
+
+    const cols = 2;
+    const pos = new Float32Array(rows.length * cols * 3);
+    let bedY = Infinity;
+    for (const s of rows) {
+      route.sample(s, 0, sample);
+      bedY = Math.min(bedY, sample.pos.y - CROSSING_DEPTH);
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      route.sample(rows[i], 0, sample);
+      for (let col = 0; col < cols; col++) {
+        const u = (col === 0 ? -1 : 1) * 700;
+        const o = (i * cols + col) * 3;
+        pos[o] = sample.pos.x + sample.left.x * u;
+        pos[o + 1] = bedY + CROSSING_WATER;
+        pos[o + 2] = sample.pos.z + sample.left.z * u;
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setIndex(gridIndices(rows.length, cols, true));
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, materials.sea);
+    mesh.name = `crossing:${c.at}`;
+    out.push(mesh);
+  }
+  return out;
+}
+
 function buildRoad(route, materials) {
   const n = route.count;
   const cols = 4;
@@ -164,7 +218,8 @@ function buildRoad(route, materials) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  geo.setIndex(gridIndices(n, cols, true));
+  // 渡しの上には道が無い。舟で越えるところなので路面を抜く。
+  geo.setIndex(gridIndices(n, cols, true, (i) => route.crossingAt(route.s[i]) !== null));
   geo.computeVertexNormals();
 
   const mesh = new THREE.Mesh(geo, materials.road);
@@ -172,16 +227,42 @@ function buildRoad(route, materials) {
   return mesh;
 }
 
+/**
+ * 海面。汀線から沖へ向かって帯で張る。
+ *
+ * 以前は街道じゅうを覆う一枚板だったが、それだと内陸へ入った区間
+ * （六郷の渡しのあたりなど）にも海が敷かれてしまう。水の見えない
+ * 区間では二列を重ねて幅を殺し、海が湧かないようにする。
+ */
 function buildSea(route, materials) {
-  const geo = new THREE.PlaneGeometry(9000, 14000, 1, 1);
-  geo.rotateX(-Math.PI / 2);
+  const n = route.count;
+  const cols = 2;
+  const pos = new Float32Array(n * cols * 3);
+  const sample = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
+  const side = route.waterSide;
+
+  for (let i = 0; i < n; i++) {
+    const s = route.s[i];
+    route.sample(s, 0, sample);
+    const inner = route.widthAt(s) / 2 - 0.3;
+    const shore = Math.max(inner + 16, route.shoreOffsetAt(s));
+    // 沖は霞の先まで。水平線は霞に溶けるので、これ以上は要らない。
+    const offsets = route.waterVisibleAt(s) ? [shore + 18, shore + 3200] : [shore, shore];
+
+    for (let c = 0; c < cols; c++) {
+      const u = side * offsets[c];
+      const o = (i * cols + c) * 3;
+      pos[o] = sample.pos.x + sample.left.x * u;
+      pos[o + 1] = 0.25;
+      pos[o + 2] = sample.pos.z + sample.left.z * u;
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(gridIndices(n, cols, true));
+  geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, materials.sea);
-  // 水のある側へ寄せる。街道の向きに合わせて左右を決める。
-  const mid = route.sample(route.length / 2, 0);
-  mesh.position
-    .copy(mid.pos)
-    .addScaledVector(mid.left, route.waterSide * 1400)
-    .setY(0.25);
   mesh.name = 'sea';
   mesh.renderOrder = -1;
   return mesh;
@@ -200,7 +281,7 @@ function buildRiver(route, materials) {
     route.sample(s, 0, sample);
     const inner = route.widthAt(s) / 2 - 0.3;
     const shore = Math.max(inner + 16, route.shoreOffsetAt(s));
-    const t = Math.min(1, Math.max(0, (350 - shore) / 100));
+    const t = route.waterVisibleAt(s) ? Math.min(1, Math.max(0, (350 - shore) / 100)) : 0;
     const rw = route.riverWidth * t;
 
     const offsets = [shore + 4, shore + Math.max(4, rw - 4)];
@@ -283,8 +364,9 @@ function buildBoats(route, materials) {
   const spread = route.riverWidth ? [30, route.riverWidth - 30] : [60, 520];
 
   for (let s = 0; s < route.length; s += 190) {
+    if (!route.waterVisibleAt(s)) continue; // 水が見えない区間
     const shore = route.shoreOffsetAt(s);
-    if (shore > 300) continue; // 水が見えない区間
+    if (shore > 300) continue;
     if (rng.chance(0.45)) continue;
 
     route.sample(s + rng.range(-60, 60), 0, sample);
@@ -324,9 +406,10 @@ function sailGeometry() {
 }
 
 /** rows×cols の格子の三角形添字。法線が +Y を向く巻き方向。 */
-function gridIndices(rows, cols, forward) {
+function gridIndices(rows, cols, forward, skipRow) {
   const idx = [];
   for (let i = 0; i < rows - 1; i++) {
+    if (skipRow && (skipRow(i) || skipRow(i + 1))) continue;
     for (let c = 0; c < cols - 1; c++) {
       const a = i * cols + c;
       const b = a + 1;

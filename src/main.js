@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import './styles.css';
-import { Route } from './core/route.js';
+import { Route, FERRY_LANDING } from './core/route.js';
 import { CAMERA, FOG, FAST_FORWARD, LOOK, TIME_SCALE } from './core/config.js';
 import { buildTerrain } from './game/terrain.js';
 import { createMaterials } from './game/materials.js';
@@ -93,6 +93,8 @@ async function buildStage(id) {
     bumps: 0,
     gatePassedAt: null,
     finishedAt: null,
+    /** いま乗っている渡し。{ crossing, boarded } か null。 */
+    ferry: null,
   };
   chase.reset();
   chase.place(stage, true);
@@ -220,6 +222,8 @@ function startRun() {
   st.bumps = 0;
   st.gatePassedAt = null;
   st.finishedAt = null;
+  st.ferry = null;
+  for (const c of st.route.crossings) st.landmarks.setFerry(c.at, null);
   st.phase = 'running';
 
   document.getElementById('title-screen').hidden = true;
@@ -327,6 +331,8 @@ function step(dtWall) {
     }
   }
 
+  updateFerry(dtWall, dt);
+
   if (player.s >= route.length - 0.5) {
     finish('arrived');
     return;
@@ -349,6 +355,75 @@ function step(dtWall) {
     hud.update({ player, clock, gateClosed });
     minimap?.update(player);
   }
+}
+
+/** 渡し船が水面を進む速さ (m/s、ゲーム内)。棹で押す舟なので歩くより遅い。 */
+const FERRY_SPEED = 3.0;
+/** 向こう岸の船着場に降りるまでの余分な里程 (m)。 */
+const LANDING_M = FERRY_LANDING;
+/**
+ * 舟を待つあいだ、実際に手を止めている秒数。
+ *
+ * 待ち時間そのものは街道データに書いた史料どおりの分数を刻から差し引く。
+ * ただしそれを実時間で待たせると四分近く画面の前で立ち尽くすことになるので、
+ * 里程を縮めない代わりに実時間だけを縮めるという、この道中の他の場所と
+ * 同じ扱いにしてある。刻はきちんと進み、暮六つには間に合わなくなる。
+ */
+const FERRY_WAIT_WALL = 7;
+
+/**
+ * 渡し。
+ *
+ * 橋の無い川では、岸で舟を待ち、乗って向こう岸へ渡る。
+ * 待ちのあいだは咎めと同じ足止めの仕掛けを使うので、HUD に残り秒が出る。
+ * 待ち時間は史料どおりの目安を街道データに書いてある。
+ */
+function updateFerry(dtWall, dt) {
+  const { route, player, clock, hud, landmarks } = stage;
+  const ferry = stage.ferry;
+
+  if (ferry) {
+    const c = ferry.crossing;
+
+    if (ferry.wait > 0) {
+      const spent = Math.min(dtWall, ferry.wait);
+      ferry.wait -= spent;
+      // 待った分の刻。史料どおりの分数を、縮めた実時間のあいだに進める。
+      clock.advance((c.waitMinutes * 60 * spent) / FERRY_WAIT_WALL);
+      // HUD の足止め表示を使う。残り秒がそのまま出るように刻へ換算しておく。
+      player.stunUntil = clock.minutes + (ferry.wait * TIME_SCALE) / 60;
+      player.speed = 0;
+    } else {
+      if (!ferry.boarded) {
+        ferry.boarded = true;
+        player.stunUntil = 0;
+        hud.toast('舟が来た。乗り込む。', { strong: true });
+      }
+      // 舟の位置は舟が持つ。飛脚がいくら走っても舟は速くならない。
+      ferry.s = Math.min(c.far + LANDING_M, ferry.s + FERRY_SPEED * dt);
+    }
+
+    player.s = ferry.s;
+    player.u = 0;
+    player.speed = 0;
+    // 待つあいだは舟はまだ向こう岸。漕ぎ出してから姿を見せる。
+    landmarks.setFerry(c.at, ferry.boarded ? ferry.s : null);
+
+    if (ferry.s >= c.far + LANDING_M) {
+      landmarks.setFerry(c.at, null);
+      stage.ferry = null;
+      hud.toast('向こう岸へ上がった。', { strong: true });
+    }
+    return;
+  }
+
+  // 岸へ着いたら舟を待つ
+  const next = route.nextCrossing(player.s);
+  if (!next || player.s < next.near) return;
+
+  player.s = next.near;
+  stage.ferry = { crossing: next, boarded: false, s: next.near, wait: FERRY_WAIT_WALL };
+  hud.toast(`${next.at}。舟を待つ。刻を ${next.waitMinutes} 分ほど食う。`, { strong: true });
 }
 
 /** HUD を書き換える間隔 (秒)。 */

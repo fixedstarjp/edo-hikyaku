@@ -281,6 +281,19 @@ async function buildRoute(file) {
     center: round(sOf(p.at) + (p.offset ?? 0), 1),
   }));
 
+  // 渡し。橋の無い川を舟で越える。里程と水面の幅から、
+  // 手前の岸・向こう岸の里程をここで出しておく。
+  const crossings = (route.crossings ?? []).map((c) => {
+    const center = sOf(c.at);
+    const half = c.widthM / 2;
+    return {
+      ...c,
+      s: round(center, 1),
+      near: round(center - half, 1),
+      far: round(center + half, 1),
+    };
+  });
+
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
   const maxGrade = Math.max(...grade.map(Math.abs));
@@ -312,6 +325,7 @@ async function buildRoute(file) {
     width,
     sections,
     processions,
+    crossings,
     shoreline: route.shoreline ?? null,
     samples: { s, x: xs, y: ys, z: zs, grade },
     landmarks,
@@ -340,6 +354,7 @@ async function buildRoute(file) {
     totalLength: out.totalLength,
     historicalDistance: route.historicalDistance,
     stats: out.stats,
+    crossings: crossings.map((c) => ({ name: c.at, waitMinutes: c.waitMinutes })),
   };
 }
 
