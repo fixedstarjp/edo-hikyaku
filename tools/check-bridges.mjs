@@ -19,6 +19,15 @@ const DEG = Math.PI / 180;
 const world = TILE * 2 ** ZOOM;
 /** 橋からこの距離までに水面があれば「その橋の川」とみなす (m)。 */
 const REACH = 400;
+/**
+ * 打点が二つ以上続けば、幅 15m 以上の水面として信用してよい。
+ *
+ * 一点きりの青は当てにならない。麻布の一の橋では、古川の真上を首都高が
+ * 覆っていて水面が描かれず、280m 離れた別の青い画素を拾ってしまった。
+ * ただし細い川では一点しか当たらないこともある（板橋の石神井川、
+ * 赤坂の外堀）。捨てずに「要確認」と印を付け、地図で見る手掛かりに残す。
+ */
+const SURE_RUN = 2;
 
 const toPx = (lat, lon) => {
   const r = lat * DEG;
@@ -68,22 +77,34 @@ for (const file of files) {
 
   console.log(`\n[${d.meta.id}] ${d.meta.road} ${d.meta.name}`);
   for (const b of bridges) {
-    let best = null;
+    // 連続した水面の区間を拾い、一点きりのものは捨てる
+    const runs = [];
+    let cur = null;
     for (let i = 0; i < s.length; i++) {
-      const gap = s[i] - b.s;
-      if (Math.abs(gap) > REACH) continue;
+      if (Math.abs(s[i] - b.s) > REACH) { cur = null; continue; }
       const [lat, lon] = un(x[i], z[i]);
-      if (!(await isWater(lat, lon))) continue;
-      if (!best || Math.abs(gap) < Math.abs(best.gap)) best = { gap, s: s[i], lat, lon };
+      if (await isWater(lat, lon)) {
+        if (cur) { cur.to = i; cur.n++; }
+        else cur = { from: i, to: i, n: 1 };
+        if (cur.n === 1) runs.push(cur);
+      } else cur = null;
+    }
+    let best = null;
+    for (const r of runs) {
+      const mid = Math.floor((r.from + r.to) / 2);
+      const gap = s[mid] - b.s;
+      const [lat, lon] = un(x[mid], z[mid]);
+      if (!best || Math.abs(gap) < Math.abs(best.gap)) best = { gap, s: s[mid], lat, lon, n: r.n };
     }
     if (!best) {
-      console.log(`  ${b.name.padEnd(8)} ${String(Math.round(b.s)).padStart(5)}m  水面なし（暗渠か埋立か、橋の描画で隠れている）`);
+      console.log(`  ${b.name.padEnd(8)} ${String(Math.round(b.s)).padStart(5)}m  水面なし（暗渠・埋立・橋や高架の描画で隠れている。地図を目で見て確かめること）`);
     } else {
       const off = Math.round(best.gap);
       const mark = Math.abs(off) > 60 ? '  ← ずれている' : '';
+      const sure = best.n >= SURE_RUN ? '' : '  ※一点きり。地図で目視すること';
       console.log(
         `  ${b.name.padEnd(8)} ${String(Math.round(b.s)).padStart(5)}m  水面は ${String(Math.round(best.s)).padStart(5)}m ` +
-        `(${off > 0 ? '+' : ''}${off}m)  ${best.lat.toFixed(5)}, ${best.lon.toFixed(5)}${mark}`
+        `(${off > 0 ? '+' : ''}${off}m)  ${best.lat.toFixed(5)}, ${best.lon.toFixed(5)}${mark}${sure}`
       );
     }
   }
