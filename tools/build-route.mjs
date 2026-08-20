@@ -238,9 +238,18 @@ async function buildRoute(file) {
   }
 
   // 勾配 (‰)。中央差分。
+  //
+  // 最後の打点は端数なので、隣との間隔が数 m しかないことがある。そのまま
+  // 中央差分を取ると、わずかな標高差が数百‰の崖に化ける。神奈川→保土ヶ谷が
+  // 実際そうなっていて、終点の 16cm の段差が 170‰ と出ていた。
+  // 間隔が刻み幅の半分に満たないときは、足りるところまで前後へ広げる。
   const grade = s.map((_, i) => {
-    const a = Math.max(0, i - 1);
-    const b = Math.min(s.length - 1, i + 1);
+    let a = Math.max(0, i - 1);
+    let b = Math.min(s.length - 1, i + 1);
+    while (s[b] - s[a] < STEP_M * 0.5 && (a > 0 || b < s.length - 1)) {
+      if (a > 0) a--;
+      if (b < s.length - 1) b++;
+    }
     const ds = s[b] - s[a];
     return ds > 0 ? round(((ys[b] - ys[a]) / ds) * 1000, 1) : 0;
   });

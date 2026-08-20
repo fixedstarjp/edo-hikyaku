@@ -479,7 +479,8 @@ body {
 .title-inner {
   margin: auto;
   text-align: center;
-  max-width: 560px;
+  /* 区間が十になったので四列に広げた。三列だと四段になって「出立」が画面から出る。 */
+  max-width: 760px;
   padding: 8px 30px;
 }
 
@@ -494,7 +495,7 @@ body {
 
 .title-inner h1 {
   font-family: var(--mincho);
-  font-size: 34px;
+  font-size: 32px;
   letter-spacing: 0.24em;
   text-indent: 0.24em;
   margin: 0;
@@ -519,7 +520,7 @@ body {
 /* 街道が増えたので三列。縦に伸ばすと「出立」が画面から出てしまう。 */
 .stage-list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 7px;
   margin-bottom: 10px;
 }
@@ -530,7 +531,7 @@ body {
   gap: 2px;
   align-content: start;
   text-align: left;
-  padding: 7px 13px;
+  padding: 6px 11px;
   font-family: var(--gothic);
   font-size: 13px;
   letter-spacing: 0.03em;

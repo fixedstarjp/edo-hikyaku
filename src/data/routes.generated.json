@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-19",
+  "generatedAt": "2026-08-20",
   "routes": [
     {
       "id": "tokaido-01",
@@ -52,10 +52,56 @@
       ]
     },
     {
+      "id": "tokaido-03",
+      "road": "東海道",
+      "stage": 3,
+      "order": 3,
+      "name": "川崎宿 → 神奈川宿",
+      "from": "川崎宿",
+      "to": "神奈川宿",
+      "summary": "多摩川を渡った先の在方の道。八丁畷の一本道を抜け、市場の一里塚を数え、鶴見橋を渡る。生麦から子安へは左手がずっと海で、神奈川湊の湊町へ入る。",
+      "totalLength": 9714.2,
+      "historicalDistance": {
+        "ri": 2,
+        "cho": 18,
+        "km": 9.8,
+        "source": "東海道宿村大概帳、川崎宿〜神奈川宿 二里半。日本橋からは七里"
+      },
+      "stats": {
+        "minElevation": 1.14,
+        "maxElevation": 7.6,
+        "maxGradePermil": 26
+      },
+      "crossings": []
+    },
+    {
+      "id": "tokaido-04",
+      "road": "東海道",
+      "stage": 4,
+      "order": 4,
+      "name": "神奈川宿 → 保土ヶ谷宿",
+      "from": "神奈川宿",
+      "to": "保土ヶ谷宿",
+      "summary": "一里九丁の短い区間。湊町を出るとすぐ台町の坂で、茶屋の縁から袖ヶ浦を見下ろす。芝生の追分で八王子道を分け、帷子川を渡って保土ヶ谷へ入る。",
+      "totalLength": 5070.4,
+      "historicalDistance": {
+        "ri": 1,
+        "cho": 9,
+        "km": 4.9,
+        "source": "東海道宿村大概帳、神奈川宿〜保土ヶ谷宿 一里九丁。日本橋からは八里九丁"
+      },
+      "stats": {
+        "minElevation": 1.37,
+        "maxElevation": 14.45,
+        "maxGradePermil": 71
+      },
+      "crossings": []
+    },
+    {
       "id": "koshu-01",
       "road": "甲州道中",
       "stage": 1,
-      "order": 3,
+      "order": 5,
       "name": "日本橋 → 内藤新宿",
       "from": "日本橋",
       "to": "内藤新宿",
@@ -77,7 +123,7 @@
       "id": "nakasendo-01",
       "road": "中山道",
       "stage": 1,
-      "order": 4,
+      "order": 6,
       "name": "日本橋 → 板橋宿",
       "from": "日本橋",
       "to": "板橋宿",
@@ -100,7 +146,7 @@
       "id": "nakasendo-02",
       "road": "中山道",
       "stage": 2,
-      "order": 5,
+      "order": 7,
       "name": "板橋宿 → 蕨宿",
       "from": "板橋宿",
       "to": "蕨宿",
@@ -128,7 +174,7 @@
       "id": "nikko-01",
       "road": "日光道中・奥州道中",
       "stage": 1,
-      "order": 6,
+      "order": 8,
       "name": "日本橋 → 千住宿",
       "from": "日本橋",
       "to": "千住宿",
@@ -150,7 +196,7 @@
       "id": "oyama-01",
       "road": "大山道",
       "stage": 1,
-      "order": 7,
+      "order": 9,
       "name": "赤坂御門 → 三軒茶屋",
       "from": "赤坂御門",
       "to": "三軒茶屋",
@@ -172,7 +218,7 @@
       "id": "azabu-01",
       "road": "麻布 坂めぐり",
       "stage": 1,
-      "order": 8,
+      "order": 10,
       "name": "飯倉 → 六本木",
       "from": "飯倉",
       "to": "六本木",
