@@ -18,6 +18,22 @@ import { instanced } from './townscape.js';
 
 /** 帯の外縁 (m)。よそ見で霞を払ったときに端が見えない距離。 */
 const FAR = 950;
+/** 遠景を基準の高さへ寄せ始める距離 (m)。ここまでは街道の標高そのまま。 */
+const NEAR_TRUE = 280;
+/**
+ * 遠景の地面を、街道の標高からどれだけ下の基準面へ寄せるかの上限 (m)。
+ *
+ * 地面は街道の標高を横へ押し出して作っている。街道がまっすぐなうちは
+ * それでよいが、麻布の坂めぐりのように道が弧を描いて戻ってくると、
+ * 尾根を走っている区間の帯が、谷にいる自分の頭上へ 950m 伸びてきて
+ * 空を塞ぐ。実際そうなっていて、狸穴坂を下りきったあたりで空の四割が
+ * 濃い土色の天井になっていた。
+ *
+ * そこで遠景ほど低い基準面へ寄せる。谷から見上げれば遠くの地面は
+ * 視線より下へ抜け、尾根から見渡せば遠くが落ち込む。麻布のように
+ * 谷と台地が入り組む土地では、そのほうがむしろ実際に近い。
+ */
+const FAR_DROP_MAX = 26;
 
 const COLORS = {
   // よそ見で遠くまで見えるようになったぶん、遠景は沈めておかないと
@@ -37,8 +53,11 @@ export function buildTerrain(route, materials) {
   if (route.hasWater) {
     // 川は帯で、海は一枚の広い水面で作る。
     group.add(route.riverWidth ? buildRiver(route, materials) : buildSea(route, materials));
-    const boats = buildBoats(route, materials);
-    if (boats) group.add(boats);
+    // 古川のように細い川へ弁才船は浮かべない。帆柱だけで九間半あり、川幅を越える。
+    if (!route.riverWidth || route.riverWidth >= 60) {
+      const boats = buildBoats(route, materials);
+      if (boats) group.add(boats);
+    }
     if (route.riverWidth) {
       const bank = buildFarBank(route, materials);
       if (bank) group.add(bank);
@@ -73,11 +92,22 @@ function buildGroundSide(route, materials, side) {
     // 水の見えない区間では水の列を陸の端へ畳んでしまう。
     // 列の数は帯じゅうで揃っていないといけないので、消すのではなく重ねる。
     const dry = withWater && !route.waterVisibleAt(s);
+    // 遠景の基準面。街道じゅうの最低標高よりさらに下へ置き、
+    // どの区間の帯も他の区間の頭上に来ないようにする。
+    const baseY = Math.max(route.stats.minElevation - 2, roadY - FAR_DROP_MAX);
+    const farY = (d) => {
+      if (d <= NEAR_TRUE) return roadY;
+      const t = Math.min(1, (d - NEAR_TRUE) / (FAR - NEAR_TRUE));
+      return roadY + (baseY - roadY) * t * t * (3 - 2 * t);
+    };
 
     let spec;
     if (dry) {
-      const edge = { d: FAR, y: roadY, kind: 'far' };
-      spec = [{ d: inner, y: roadY - 0.12, kind: 'verge' }, { d: 280, y: roadY, kind: 'far' }];
+      const edge = { d: FAR, y: farY(FAR), kind: 'far' };
+      spec = [
+        { d: inner, y: roadY - 0.12, kind: 'verge' },
+        { d: NEAR_TRUE, y: farY(NEAR_TRUE), kind: 'far' },
+      ];
       while (spec.length < cols) spec.push(edge);
     } else if (withWater && river) {
       // 川。対岸を立ち上げて向こう岸を見せる。
@@ -107,8 +137,8 @@ function buildGroundSide(route, materials, side) {
     } else {
       spec = [
         { d: inner, y: roadY - 0.12, kind: 'verge' },
-        { d: 280, y: roadY, kind: 'far' },
-        { d: FAR, y: roadY, kind: 'far' },
+        { d: NEAR_TRUE, y: farY(NEAR_TRUE), kind: 'far' },
+        { d: FAR, y: farY(FAR), kind: 'far' },
       ];
     }
 
