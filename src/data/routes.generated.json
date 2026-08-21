@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-20",
+  "generatedAt": "2026-08-21",
   "routes": [
     {
       "id": "tokaido-01",
@@ -166,10 +166,107 @@
       "crossings": []
     },
     {
+      "id": "koshu-02",
+      "road": "甲州道中",
+      "stage": 2,
+      "order": 8,
+      "name": "内藤新宿 → 下高井戸宿",
+      "from": "内藤新宿",
+      "to": "下高井戸宿",
+      "summary": "新宿の追分で青梅街道を分け、江戸の外へ。角筈から幡ヶ谷・笹塚へ、玉川上水が街道と並んで西へ流れる。武蔵野の台地の上をまっすぐ行く二里である。",
+      "totalLength": 7860.9,
+      "historicalDistance": {
+        "ri": 2,
+        "cho": 0,
+        "km": 7.9,
+        "source": "甲州道中、内藤新宿〜下高井戸宿 二里。日本橋からは四里"
+      },
+      "stats": {
+        "minElevation": 34.8,
+        "maxElevation": 48.3,
+        "maxGradePermil": 39
+      },
+      "crossings": []
+    },
+    {
+      "id": "koshu-03",
+      "road": "甲州道中",
+      "stage": 3,
+      "order": 9,
+      "name": "下高井戸宿 → 国領宿",
+      "from": "下高井戸宿",
+      "to": "国領宿",
+      "summary": "十二丁で上高井戸へ、そこから一里十九丁の在方の道。給田・仙川と武蔵野の畑を抜け、滝坂を下って布田五宿の東の端、国領へ入る。",
+      "totalLength": 7006.5,
+      "historicalDistance": {
+        "ri": 1,
+        "cho": 31,
+        "km": 7.2,
+        "source": "甲州道中、下高井戸宿〜上高井戸宿 十二丁と、上高井戸宿〜国領宿 一里十九丁の合計。日本橋からは五里三十一丁"
+      },
+      "stats": {
+        "minElevation": 30.45,
+        "maxElevation": 49.28,
+        "maxGradePermil": 61.3
+      },
+      "crossings": []
+    },
+    {
+      "id": "koshu-04",
+      "road": "甲州道中",
+      "stage": 4,
+      "order": 10,
+      "name": "国領宿 → 府中宿",
+      "from": "国領宿",
+      "to": "府中宿",
+      "summary": "布田五宿を東から西へ通し、飛田給・車返と抜けて武蔵国府の町へ入る。府中は国衙の置かれた古い町で、大國魂の社と大門の欅並木がある。",
+      "totalLength": 7757.4,
+      "historicalDistance": {
+        "ri": 2,
+        "cho": 0,
+        "km": 7.9,
+        "source": "甲州道中、布田五宿を通って上石原宿〜府中宿 一里十丁。国領から上石原までの五宿の長さを加えるとおよそ二里。日本橋からは七里三十一丁"
+      },
+      "stats": {
+        "minElevation": 33.22,
+        "maxElevation": 55.29,
+        "maxGradePermil": 16
+      },
+      "crossings": []
+    },
+    {
+      "id": "koshu-05",
+      "road": "甲州道中",
+      "stage": 5,
+      "order": 11,
+      "name": "府中宿 → 日野宿",
+      "from": "府中宿",
+      "to": "日野宿",
+      "summary": "国府の町を出て本宿・谷保へ。天満宮の門前を過ぎ、青柳から多摩川の河原へ下る。日野の渡しで舟を待ち、川を越えれば多摩の日野宿である。",
+      "totalLength": 8074.8,
+      "historicalDistance": {
+        "ri": 2,
+        "cho": 0,
+        "km": 7.9,
+        "source": "甲州道中、府中宿〜日野宿 二里。日本橋からは九里三十一丁"
+      },
+      "stats": {
+        "minElevation": 48.63,
+        "maxElevation": 74.54,
+        "maxGradePermil": 53.3
+      },
+      "crossings": [
+        {
+          "name": "日野の渡し",
+          "waitMinutes": 10
+        }
+      ]
+    },
+    {
       "id": "nakasendo-01",
       "road": "中山道",
       "stage": 1,
-      "order": 8,
+      "order": 12,
       "name": "日本橋 → 板橋宿",
       "from": "日本橋",
       "to": "板橋宿",
@@ -192,7 +289,7 @@
       "id": "nakasendo-02",
       "road": "中山道",
       "stage": 2,
-      "order": 9,
+      "order": 13,
       "name": "板橋宿 → 蕨宿",
       "from": "板橋宿",
       "to": "蕨宿",
@@ -220,7 +317,7 @@
       "id": "nikko-01",
       "road": "日光道中・奥州道中",
       "stage": 1,
-      "order": 10,
+      "order": 14,
       "name": "日本橋 → 千住宿",
       "from": "日本橋",
       "to": "千住宿",
@@ -242,7 +339,7 @@
       "id": "oyama-01",
       "road": "大山道",
       "stage": 1,
-      "order": 11,
+      "order": 15,
       "name": "赤坂御門 → 三軒茶屋",
       "from": "赤坂御門",
       "to": "三軒茶屋",
@@ -264,7 +361,7 @@
       "id": "azabu-01",
       "road": "麻布 坂めぐり",
       "stage": 1,
-      "order": 12,
+      "order": 16,
       "name": "飯倉 → 六本木",
       "from": "飯倉",
       "to": "六本木",

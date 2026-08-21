@@ -520,7 +520,7 @@ body {
 /* 街道が増えたので三列。縦に伸ばすと「出立」が画面から出てしまう。 */
 .stage-list {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   margin-bottom: 10px;
   text-align: left;
 }
