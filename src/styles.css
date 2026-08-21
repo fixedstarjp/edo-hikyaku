@@ -520,44 +520,62 @@ body {
 /* 街道が増えたので三列。縦に伸ばすと「出立」が画面から出てしまう。 */
 .stage-list {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 7px;
+  gap: 6px;
   margin-bottom: 10px;
+  text-align: left;
 }
 
-.stage-card {
-  touch-action: manipulation;
+/* 街道の名を左に置き、その右へ区間の札を並べる。一街道で一行。 */
+.road-group {
   display: grid;
-  gap: 2px;
-  align-content: start;
-  text-align: left;
-  padding: 6px 11px;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.road-name {
+  font-family: var(--mincho);
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  text-align: right;
+  padding-top: 5px;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+/* 起点は街道につき一つなので、見出しに小さく添える。 */
+.road-from {
+  display: block;
   font-family: var(--gothic);
-  font-size: 13px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  opacity: 0.5;
+}
+
+.road-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.stage-chip {
+  touch-action: manipulation;
+  padding: 5px 11px;
+  font-family: var(--gothic);
+  font-size: 12.5px;
   letter-spacing: 0.03em;
+  white-space: nowrap;
   border: 1px solid rgba(239, 228, 203, 0.24);
   background: rgba(239, 228, 203, 0.04);
 }
 
-.stage-card:hover:not(:disabled) {
+.stage-chip:hover:not(:disabled) {
   background: rgba(239, 228, 203, 0.1);
 }
 
-.stage-card.on {
+.stage-chip.on {
   border-color: var(--kincha);
   background: rgba(184, 146, 90, 0.16);
-}
-
-.stage-road {
-  font-family: var(--mincho);
-  font-size: 17px;
-  letter-spacing: 0.1em;
-  white-space: nowrap;
-}
-
-.stage-name {
-  font-size: 12.5px;
-  opacity: 0.85;
 }
 
 .stage-figures {
@@ -568,10 +586,6 @@ body {
 
 .title-inner {
   max-width: 700px;
-}
-
-.stage-road {
-  white-space: normal;
 }
 
 .result-buttons {
@@ -1004,16 +1018,18 @@ button:disabled {
     margin-bottom: 14px;
   }
 
-  .stage-card {
-    padding: 9px 12px;
+  .road-group {
+    grid-template-columns: 108px 1fr;
+    gap: 8px;
   }
 
-  .stage-road {
+  .road-name {
     font-size: 14px;
   }
 
-  .stage-name {
-    font-size: 11px;
+  .stage-chip {
+    font-size: 11.5px;
+    padding: 5px 9px;
   }
 
   .stage-figures {
@@ -1104,21 +1120,32 @@ button:disabled {
     bottom: 184px;
   }
 
-  /* 縦持ちの携帯でも巻き取らずに「出立」まで見えるよう、
-     一画面に収まるところまで詰める。区間が八つになったので二列にした。 */
+  /* 縦持ちの携帯でも巻き取らずに「出立」まで見えるよう、一画面に収まるところまで
+     詰める。幅が足りないので、街道の名は札の上へ回す。 */
   .stage-list {
-    grid-template-columns: 1fr 1fr;
-    gap: 5px;
+    gap: 7px;
     margin-bottom: 10px;
   }
 
-  .stage-card {
-    padding: 6px 12px;
-    gap: 1px;
+  .road-group {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 
-  .stage-road {
+  .road-name {
     font-size: 13px;
+    text-align: left;
+    padding-top: 0;
+  }
+
+  .road-from {
+    display: inline;
+    margin-left: 6px;
+  }
+
+  .stage-chip {
+    font-size: 11.5px;
+    padding: 5px 9px;
   }
 
   .title-inner {
@@ -1227,9 +1254,9 @@ button:disabled {
     margin-bottom: 9px;
   }
 
-  .stage-card {
-    padding: 6px 12px;
-    gap: 1px;
+  .stage-chip {
+    padding: 4px 9px;
+    font-size: 11px;
   }
 
   .title-brief {
