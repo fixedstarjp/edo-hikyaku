@@ -98,10 +98,56 @@
       "crossings": []
     },
     {
+      "id": "tokaido-05",
+      "road": "東海道",
+      "stage": 5,
+      "order": 5,
+      "name": "保土ヶ谷宿 → 戸塚宿",
+      "from": "保土ヶ谷宿",
+      "to": "戸塚宿",
+      "summary": "江戸を出て最初の難所。宿を出るとすぐ権太坂にかかり、武蔵と相模の境を越える。焼餅坂を下り、品濃の一里塚を過ぎ、柏尾川を渡って戸塚へ入る。ここから先は丘陵の道である。",
+      "totalLength": 8974,
+      "historicalDistance": {
+        "ri": 2,
+        "cho": 9,
+        "km": 8.7,
+        "source": "東海道宿村大概帳、保土ヶ谷宿〜戸塚宿 二里九丁。日本橋からは十里半"
+      },
+      "stats": {
+        "minElevation": 8.16,
+        "maxElevation": 66.67,
+        "maxGradePermil": 148.3
+      },
+      "crossings": []
+    },
+    {
+      "id": "tokaido-06",
+      "road": "東海道",
+      "stage": 6,
+      "order": 6,
+      "name": "戸塚宿 → 藤沢宿",
+      "from": "戸塚宿",
+      "to": "藤沢宿",
+      "summary": "戸塚を出るとすぐ大坂の長い登り。原宿・影取と丘陵の間を抜け、遊行寺坂を一気に下って時宗の総本山の門前へ出る。境川を渡れば藤沢宿、江ノ島道の分かれるところである。",
+      "totalLength": 7517.9,
+      "historicalDistance": {
+        "ri": 2,
+        "cho": 0,
+        "km": 7.9,
+        "source": "東海道宿村大概帳、戸塚宿〜藤沢宿 二里。日本橋からは十二里半"
+      },
+      "stats": {
+        "minElevation": 9.19,
+        "maxElevation": 68.44,
+        "maxGradePermil": 134.7
+      },
+      "crossings": []
+    },
+    {
       "id": "koshu-01",
       "road": "甲州道中",
       "stage": 1,
-      "order": 5,
+      "order": 7,
       "name": "日本橋 → 内藤新宿",
       "from": "日本橋",
       "to": "内藤新宿",
@@ -123,7 +169,7 @@
       "id": "nakasendo-01",
       "road": "中山道",
       "stage": 1,
-      "order": 6,
+      "order": 8,
       "name": "日本橋 → 板橋宿",
       "from": "日本橋",
       "to": "板橋宿",
@@ -146,7 +192,7 @@
       "id": "nakasendo-02",
       "road": "中山道",
       "stage": 2,
-      "order": 7,
+      "order": 9,
       "name": "板橋宿 → 蕨宿",
       "from": "板橋宿",
       "to": "蕨宿",
@@ -174,7 +220,7 @@
       "id": "nikko-01",
       "road": "日光道中・奥州道中",
       "stage": 1,
-      "order": 8,
+      "order": 10,
       "name": "日本橋 → 千住宿",
       "from": "日本橋",
       "to": "千住宿",
@@ -196,7 +242,7 @@
       "id": "oyama-01",
       "road": "大山道",
       "stage": 1,
-      "order": 9,
+      "order": 11,
       "name": "赤坂御門 → 三軒茶屋",
       "from": "赤坂御門",
       "to": "三軒茶屋",
@@ -218,7 +264,7 @@
       "id": "azabu-01",
       "road": "麻布 坂めぐり",
       "stage": 1,
-      "order": 10,
+      "order": 12,
       "name": "飯倉 → 六本木",
       "from": "飯倉",
       "to": "六本木",

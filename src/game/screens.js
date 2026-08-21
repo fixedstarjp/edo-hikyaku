@@ -20,23 +20,36 @@ export function fmtMinutes(m) {
 }
 
 /**
- * 街道の一覧を並べ替える。
+ * 街道の一覧。
+ *
+ * 区間を平らに並べると、東海道が六つに増えたところで何がどの街道の
+ * 続きなのか読めなくなる。街道ごとにまとめ、区間は行き先だけの札にする。
+ * 起点は街道の見出しに添えるので、札は「→ どこまで」で足りる。
+ *
  * @param onSelect 札を押したときに呼ぶ
  */
 export function renderStageList(manifest, selectedId, onSelect) {
+  const byRoad = new Map();
+  for (const r of manifest.routes) {
+    if (!byRoad.has(r.road)) byRoad.set(r.road, []);
+    byRoad.get(r.road).push(r);
+  }
+
   const list = document.getElementById('stage-list');
-  list.innerHTML = manifest.routes
-    .map(
-      (r) => `
-      <button class="stage-card${r.id === selectedId ? ' on' : ''}" data-id="${r.id}">
-        <span class="stage-road">${r.road}</span>
-        <span class="stage-name">${r.from} — ${r.to}</span>
-      </button>`
-    )
+  list.innerHTML = [...byRoad].
+    map(([road, stages]) => `
+      <div class="road-group">
+        <div class="road-name">${road}${stages[0].from === '日本橋' ? '' : `<span class="road-from">${stages[0].from}から</span>`}</div>
+        <div class="road-stages">${stages
+          .map(
+            (r) => `<button class="stage-chip${r.id === selectedId ? ' on' : ''}" data-id="${r.id}">${r.to}</button>`
+          )
+          .join('')}</div>
+      </div>`)
     .join('');
 
-  for (const card of list.querySelectorAll('.stage-card')) {
-    card.addEventListener('click', () => onSelect(card.dataset.id));
+  for (const chip of list.querySelectorAll('.stage-chip')) {
+    chip.addEventListener('click', () => onSelect(chip.dataset.id));
   }
 }
 
