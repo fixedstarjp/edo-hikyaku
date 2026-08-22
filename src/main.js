@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './styles.css';
 import { Route, FERRY_LANDING } from './core/route.js';
-import { CAMERA, FOG, FAST_FORWARD, LOOK, TIME_SCALE } from './core/config.js';
+import { CAMERA, VIEWS, FOG, FAST_FORWARD, LOOK, TIME_SCALE } from './core/config.js';
 import { buildTerrain } from './game/terrain.js';
 import { createMaterials } from './game/materials.js';
 import { ChaseCamera } from './game/camera.js';
@@ -41,9 +41,12 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(CAMERA.fov, window.innerWidth / window.innerHeight, 0.3, 3000);
+/** 選んだ視点は次に遊ぶときも覚えておく。 */
+const VIEW_KEY = 'hikyaku.view';
+const savedView = Math.max(0, VIEWS.findIndex((v) => v.id === localStorage.getItem(VIEW_KEY)));
+const camera = new THREE.PerspectiveCamera(VIEWS[savedView].fov, window.innerWidth / window.innerHeight, 0.3, 3000);
 /** 背中を追うカメラ。よそ見の角もここが持つ。 */
-const chase = new ChaseCamera(camera);
+const chase = new ChaseCamera(camera, savedView);
 /** よそ見の向き。ドラッグと操作盤から読む。 */
 const look = chase.look;
 
@@ -96,6 +99,7 @@ async function buildStage(id) {
     /** いま乗っている渡し。{ crossing, boarded } か null。 */
     ferry: null,
   };
+  applyView();
   chase.reset();
   chase.place(stage, true);
   sky.update(clock, camera.position);
@@ -134,6 +138,33 @@ const KEYS = {
   KeyF: 'fast',
 };
 
+/**
+ * 視点を移す。目線・肩越し・遠見の三つを回す。
+ * 走っている最中でも切り替えられるように、位置は寄せ直さず追従に任せる。
+ */
+function cycleView() {
+  const v = chase.cycleView();
+  localStorage.setItem(VIEW_KEY, v.id);
+  applyView();
+  showViewName(v.name);
+}
+
+function applyView() {
+  stage?.player?.setFirstPerson(chase.view.firstPerson);
+}
+
+let viewNameTimer = 0;
+function showViewName(name) {
+  const el = document.getElementById('view-name');
+  if (!el) return;
+  el.textContent = name;
+  el.hidden = false;
+  clearTimeout(viewNameTimer);
+  viewNameTimer = setTimeout(() => {
+    el.hidden = true;
+  }, 1400);
+}
+
 /** よそ見の引き量。マウスの右ドラッグと画面のなぞりで共用する。 */
 const dragLook = { active: false, yaw: 0, pitch: 0 };
 
@@ -171,10 +202,19 @@ const touch = COARSE
     )
   : null;
 
+document.getElementById('touch-view')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  cycleView();
+});
+
 addEventListener('keydown', (e) => {
   if (e.code === 'Space') {
     input.jump = true;
     e.preventDefault();
+    return;
+  }
+  if (e.code === 'KeyV') {
+    cycleView();
     return;
   }
   if (e.code === 'KeyR') {
@@ -232,6 +272,7 @@ function startRun() {
   st.minimap?.show();
   touch?.reset();
   if (touch) document.getElementById('touch').hidden = false;
+  applyView();
   chase.reset();
   chase.place(stage, true);
   st.hud.banner(st.route.landmarks[0]);
