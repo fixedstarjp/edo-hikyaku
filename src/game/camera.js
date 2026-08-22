@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAMERA, LOOK, SPEED } from '../core/config.js';
+import { CAMERA, LOOK, SPEED, VIEWS } from '../core/config.js';
 
 /**
  * 飛脚の背中を追うカメラと、よそ見。
@@ -20,8 +20,9 @@ function spring(value, velocity, target, dt) {
 }
 
 export class ChaseCamera {
-  constructor(camera) {
+  constructor(camera, viewIndex = 0) {
     this.camera = camera;
+    this.viewIndex = THREE.MathUtils.clamp(viewIndex, 0, VIEWS.length - 1);
     /** よそ見の向き。0 のとき進行方向。実際の向きは目標へばねで追う。 */
     this.look = { yaw: 0, pitch: 0, vYaw: 0, vPitch: 0, targetYaw: 0, targetPitch: 0 };
 
@@ -39,6 +40,17 @@ export class ChaseCamera {
    */
   get away() {
     return THREE.MathUtils.smoothstep(Math.abs(this.look.yaw), 0.05, 0.55);
+  }
+
+  /** いまの視点。出立をまたいでも保つ。 */
+  get view() {
+    return VIEWS[this.viewIndex];
+  }
+
+  /** 次の視点へ。戻り値は選んだ視点。 */
+  cycleView() {
+    this.viewIndex = (this.viewIndex + 1) % VIEWS.length;
+    return this.view;
   }
 
   reset() {
@@ -80,15 +92,24 @@ export class ChaseCamera {
     const { route, landmarks, player } = stage;
     const camera = this.camera;
     const sm = this._sm;
+    const v = this.view;
 
-    route.sample(player.s, player.u * 0.5, sm);
-    const focusY = sm.pos.y + landmarks.liftAt(player.s) + CAMERA.lookHeight;
+    route.sample(player.s, player.u * v.uFollow, sm);
+    // 目線のときは本人の頭なので、跳べばカメラも上がる
+    const jump = v.firstPerson ? player.jumpY : 0;
+    const focusY = sm.pos.y + landmarks.liftAt(player.s) + jump + v.lookHeight;
 
     // 進行方向を yaw だけ回した向き。これがいま見ている方角。
     this._dir.copy(sm.tangent).applyAxisAngle(UP, this.look.yaw);
 
-    this._target.set(sm.pos.x, focusY + (CAMERA.height - CAMERA.lookHeight), sm.pos.z);
-    this._target.addScaledVector(this._dir, -CAMERA.distance);
+    this._target.set(sm.pos.x, focusY + (v.height - v.lookHeight), sm.pos.z);
+    this._target.addScaledVector(this._dir, -v.distance);
+
+    // 足に合わせた上下。これが無いと、目線に寄せるほど宙を滑って見える。
+    if (v.bob && !player.airborne) {
+      const amp = THREE.MathUtils.clamp(player.speed / SPEED.run, 0, 1.2);
+      this._target.y += Math.abs(Math.sin(player.phase)) * v.bob * amp;
+    }
     if (snap) camera.position.copy(this._target);
 
     // 正面のときは街道の先（カーブの内側が見える）、よそ見のときは首の向いた先。
@@ -96,7 +117,7 @@ export class ChaseCamera {
     const away = this.away;
     const ahead = player.s + CAMERA.lookAhead;
     route.sample(ahead, player.u * 0.35, sm);
-    this._lookAt.set(sm.pos.x, sm.pos.y + landmarks.liftAt(ahead) + CAMERA.lookHeight, sm.pos.z);
+    this._lookAt.set(sm.pos.x, sm.pos.y + landmarks.liftAt(ahead) + jump + v.lookHeight, sm.pos.z);
 
     if (away > 0) {
       route.sample(player.s, player.u * 0.5, sm);
@@ -115,10 +136,11 @@ export class ChaseCamera {
     const away = this.away;
 
     // よそ見のあいだは追従を速くして、首を振った先がすぐ見えるようにする
-    const lag = CAMERA.lag + (11 - CAMERA.lag) * away;
+    const v = this.view;
+    const lag = Math.max(v.lag, v.lag + (11 - v.lag) * away);
     camera.position.lerp(this._target, 1 - Math.exp(-lag * dtWall));
 
-    const targetFov = CAMERA.fov + (player.speed > SPEED.run * 1.05 ? 5 : 0) * (1 - away);
+    const targetFov = v.fov + (player.speed > SPEED.run * 1.05 ? 5 : 0) * (1 - away);
     camera.fov += (targetFov - camera.fov) * Math.min(1, dtWall * 4);
     camera.updateProjectionMatrix();
   }

@@ -52,14 +52,58 @@ export const STAMINA = {
 };
 
 export const CAMERA = {
-  distance: 7.4,
-  height: 3.0,
   lookAhead: 9.0,
-  lookHeight: 1.3,
-  fov: 62,
-  /** 追従の緩さ (小さいほど滑らか) */
-  lag: 4.5,
 };
+
+/**
+ * 視点。
+ *
+ * 遠見だけだと自分がどこを走っているのか他人事になる。目線まで寄せると
+ * 軒の低さや溝の幅が身体の寸法で分かるようになるので、こちらを既定にする。
+ *
+ *   distance   … 飛脚の背後へ下がる距離 (m)。0 なら本人の目
+ *   height     … 路面からのカメラの高さ (m)
+ *   lookHeight … 見る先の高さ (m)
+ *   lag        … 追従の緩さ。大きいほど身体に固く付く
+ *   bob        … 足に合わせた上下の揺れ (m)
+ *   uFollow    … 横ずれをどれだけ追うか。目線は本人なので 1
+ */
+export const VIEWS = [
+  {
+    id: 'me',
+    name: '目線',
+    distance: 0,
+    height: 1.63,
+    lookHeight: 1.63,
+    fov: 74,
+    lag: 22,
+    bob: 0.055,
+    uFollow: 1,
+    firstPerson: true,
+  },
+  {
+    id: 'kata',
+    name: '肩越し',
+    distance: 3.3,
+    height: 2.1,
+    lookHeight: 1.5,
+    fov: 66,
+    lag: 8,
+    bob: 0.022,
+    uFollow: 0.8,
+  },
+  {
+    id: 'tooku',
+    name: '遠見',
+    distance: 7.4,
+    height: 3.0,
+    lookHeight: 1.3,
+    fov: 62,
+    lag: 4.5,
+    bob: 0,
+    uFollow: 0.5,
+  },
+];
 
 /**
  * よそ見。

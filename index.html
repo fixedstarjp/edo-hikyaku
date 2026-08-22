@@ -69,6 +69,7 @@
         <span class="touch-hint">↑走る<br />横に避ける ↓止まる</span>
       </div>
       <div class="touch-buttons">
+        <button id="touch-view" class="touch-view-btn">視点</button>
         <div class="touch-look">
           <button id="touch-look-left" class="touch-look-btn">◀</button>
           <span class="touch-look-label">見る</span>
@@ -80,6 +81,8 @@
         </div>
       </div>
     </div>
+
+    <div id="view-name" hidden></div>
 
     <div id="minimap" hidden>
       <canvas id="minimap-canvas"></canvas>
@@ -105,12 +108,14 @@
           <div><kbd>A</kbd><kbd>D</kbd> 避ける</div>
           <div><kbd>Space</kbd> 跳ぶ</div>
           <div><kbd>Q</kbd><kbd>E</kbd>／右ドラッグ よそ見（海や城が見える）</div>
+          <div><kbd>V</kbd> 視点（目線・肩越し・遠見）</div>
         </div>
         <div class="title-keys touch-keys" id="title-keys-touch" hidden>
           <div>左下の輪 — <b>上へ押しているあいだ走る</b>。離せば歩みに落ちる</div>
           <div>同じ輪を横へ倒して避ける（倒すほど大きく）／下へ引いて止まる</div>
           <div><b>◀ 見る ▶</b> — 押しているあいだ横を向く。離せば前へ戻る</div>
           <div>全力（押しっぱなし）と跳ぶ</div>
+          <div><b>視点</b> — 目線・肩越し・遠見を順に移す</div>
         </div>
         <button id="start-button" disabled>出立</button>
         <p class="title-credit">

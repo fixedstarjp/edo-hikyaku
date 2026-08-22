@@ -75,6 +75,7 @@ export class Player {
     hachimaki.position.y = 1.68;
     hachimaki.rotation.x = Math.PI / 2;
     g.add(hachimaki);
+    this.hachimaki = hachimaki;
 
     // 腕 — 肩を支点に振る
     this.arms = [];
@@ -124,6 +125,31 @@ export class Player {
     carry.add(cord);
     g.add(carry);
     this.carry = carry;
+    // 三人称のときの担ぎかた。目線では担ぎ直すので控えておく。
+    this._carryRest = { pos: carry.position.clone(), rot: carry.rotation.clone() };
+    // 頭のなかへ入るもの一式。目線では消す。
+    this._body = [this.torso, this.head, hachimaki, hip, ...this.arms, ...this.legs];
+  }
+
+  /**
+   * 目線の視点。
+   *
+   * 自分の頭のなかにカメラが入るので、胴も手足も消す。残すのは担ぎ棒だけ。
+   * ただし三人称の担ぎかた（棒を肩に横へ渡す）のままだと、棒が視界を
+   * 端から端まで横切ってしまう。目線のときは棒を前後に向け直して右肩へ
+   * 寄せ、御用箱を背中へ回す。走る者の目に映るのはその形である。
+   */
+  setFirstPerson(on) {
+    for (const part of this._body) part.visible = !on;
+    const c = this.carry;
+    if (on) {
+      c.position.set(-0.5, 1.36, 0.06);
+      c.rotation.set(0.2, -Math.PI / 2, -0.22);
+    } else {
+      c.position.copy(this._carryRest.pos);
+      c.rotation.copy(this._carryRest.rot);
+    }
+    this._fp = on;
   }
 
   /* --------------------------------------------------------- 動き */
@@ -234,7 +260,10 @@ export class Player {
     this.torso.position.y = 1.12 + bob;
     this.head.position.y = 1.62 + bob;
     this.torso.rotation.x = 0.06 + amp * 0.14; // 速いほど前傾
-    this.carry.rotation.z = -0.42 + Math.sin(this.phase) * 0.05 * amp;
+    // 揺れは担ぎかたに合わせる。目線では棒を前後に向けてあるので、
+    // 横へ倒す代わりに前後へ煽る。
+    if (this._fp) this.carry.rotation.x = 0.12 + Math.sin(this.phase) * 0.05 * amp;
+    else this.carry.rotation.z = -0.42 + Math.sin(this.phase) * 0.05 * amp;
   }
 
   _place() {
