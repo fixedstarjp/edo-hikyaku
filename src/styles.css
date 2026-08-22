@@ -747,6 +747,44 @@ button:disabled {
 }
 
 /* 見回しの左右揺り。なぞり方を覚えなくても押せば見回せる。 */
+/**
+ * 先の道。半里ぶんの縦断を小さく描く。
+ * 息をどこで使うかは坂がどこから始まるかで決まるので、
+ * 数字の勾配だけでなく形で見せる。
+ */
+.ahead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ahead-label {
+  font-family: var(--mincho);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.ahead-canvas {
+  width: 180px;
+  height: 42px;
+  border: 1px solid rgba(232, 220, 195, 0.2);
+  border-radius: 2px;
+  background: rgba(20, 17, 14, 0.42);
+}
+
+@media (max-width: 560px) {
+  .ahead-label {
+    display: none;
+  }
+
+  .ahead-canvas {
+    width: 116px;
+    height: 34px;
+  }
+}
+
 .touch-view-btn {
   pointer-events: auto;
   touch-action: manipulation;

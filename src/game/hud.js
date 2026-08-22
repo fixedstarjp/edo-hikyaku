@@ -16,6 +16,7 @@ export class Hud {
       deadlineLabel: document.getElementById('deadline-label'),
       deadlineValue: document.getElementById('deadline-value'),
       staminaFill: document.getElementById('stamina-fill'),
+      gradeAhead: document.getElementById('grade-ahead'),
       speed: document.getElementById('speed'),
       grade: document.getElementById('grade'),
       elevation: document.getElementById('elevation'),
@@ -30,6 +31,7 @@ export class Hud {
 
     this._buildMarks();
     this._bannerTimer = null;
+    this._profileAt = -1e9;
     this.gateLandmark = route.gateLandmark;
 
     // 大木戸のある街道は閉門、無い街道は問屋場への継立の刻限。
@@ -115,6 +117,85 @@ export class Hud {
     el.grade.textContent = `${grade >= 0 ? '+' : ''}${grade.toFixed(0)} ‰`;
     el.grade.classList.toggle('climb', grade > 12);
     el.elevation.textContent = `標高 ${route.elevationAt(player.s).toFixed(1)} m`;
+
+    // 縦断は毎コマ描き直す必要が無い。数メートル進んだら描く。
+    if (Math.abs(player.s - this._profileAt) > 5) {
+      this._profileAt = player.s;
+      this._drawProfile(player.s);
+    }
+  }
+
+  /**
+   * 先の道の縦断。
+   *
+   * 息の配分を決めるには、坂がどこから始まって何メートル続くのかが要る。
+   * 足元の勾配を数字で出すだけでは、坂に入ってから気づくことになり、
+   * 判断ではなく反応になってしまう。手前 80m から先 620m までを描く。
+   *
+   * 上りは息を食うので暖色、下りは息が整うので寒色に塗り分ける。
+   */
+  _drawProfile(s) {
+    const cv = this.el.gradeAhead;
+    if (!cv) return;
+    const g = cv.getContext('2d');
+    const W = cv.width;
+    const H = cv.height;
+    const BACK = 80;
+    const AHEAD = 620;
+    const span = BACK + AHEAD;
+    const N = 60;
+    const route = this.route;
+
+    const ys = [];
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 0; i <= N; i++) {
+      const at = Math.min(route.length, Math.max(0, s - BACK + (span * i) / N));
+      const y = route.elevationAt(at);
+      ys.push(y);
+      if (y < lo) lo = y;
+      if (y > hi) hi = y;
+    }
+    // 平らな道で線が暴れないよう、縦の幅に下限を置く
+    const mid = (lo + hi) / 2;
+    const half = Math.max(7, ((hi - lo) / 2) * 1.3);
+    const px = (i) => (W * i) / N;
+    const py = (y) => H - 8 - ((y - (mid - half)) / (half * 2)) * (H - 18);
+
+    g.clearRect(0, 0, W, H);
+
+    // 面を塗る
+    g.beginPath();
+    g.moveTo(0, H);
+    for (let i = 0; i <= N; i++) g.lineTo(px(i), py(ys[i]));
+    g.lineTo(W, H);
+    g.closePath();
+    g.fillStyle = 'rgba(199, 169, 122, 0.22)';
+    g.fill();
+
+    // 稜線。区間ごとに勾配で色を変える。
+    g.lineWidth = 3;
+    g.lineCap = 'round';
+    for (let i = 0; i < N; i++) {
+      const rise = ys[i + 1] - ys[i];
+      const run = span / N;
+      const per = (rise / run) * 1000; // 千分率
+      g.strokeStyle =
+        per > 14 ? '#d98a4e' : per > 5 ? '#c7a97a' : per < -14 ? '#6fa9c4' : '#9fb08a';
+      g.beginPath();
+      g.moveTo(px(i), py(ys[i]));
+      g.lineTo(px(i + 1), py(ys[i + 1]));
+      g.stroke();
+    }
+
+    // いまいる場所
+    const nowX = (W * BACK) / span;
+    g.strokeStyle = 'rgba(239, 228, 203, 0.85)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(nowX, 2);
+    g.lineTo(nowX, H - 2);
+    g.stroke();
   }
 
   /** 名所に差しかかったときの札。 */

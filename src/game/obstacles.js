@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { makeRng } from '../core/rng.js';
 import { SPEED, WORLD_SEED } from '../core/config.js';
+
+/**
+ * 行列の人数を街道データの何倍に組むか。
+ * データの人数は絵としての目安なので、実際の列はこれを掛けた長さになる。
+ */
+const COLUMN_SCALE = 5;
 import { groundedBox, mergeGeometries } from '../core/geometry.js';
 import { instanced } from './townscape.js';
 
@@ -63,6 +69,10 @@ export class Crowd {
     for (const p of this.processions) {
       p.center = p.baseCenter;
       p.scolded = false;
+      p.exposure = 0;
+      p.ran = false;
+      p.blocked = false;
+      p.slipped = false;
       p.warned = false;
       this._writeProcession(p);
     }
@@ -221,10 +231,15 @@ export class Crowd {
     for (const spec of this.route.processions) {
       const half = this.route.widthAt(spec.center) / 2;
       const members = [];
-      const rows = Math.ceil(spec.members / 3);
+      // 大名行列は数十人では済まない。加賀の前田は二千を越え、小藩でも
+      // 百から数百が列を成した。二十人の塊では通り過ぎるのに十数秒しか
+      // かからず、下座するか脇を抜けるかを選ぶ意味が生まれない。
+      // 街道を百数十メートル塞ぐ長さにしてはじめて、選択に重みが出る。
+      const total = spec.members * COLUMN_SCALE;
+      const rows = Math.ceil(total / 3);
       const rowGap = 3.2;
       for (let r = 0; r < rows; r++) {
-        const perRow = Math.min(3, spec.members - r * 3);
+        const perRow = Math.min(3, total - r * 3);
         for (let c = 0; c < perRow; c++) {
           const spread = perRow === 1 ? 0 : (c / (perRow - 1) - 0.5) * 2;
           members.push({
@@ -244,6 +259,11 @@ export class Crowd {
         warned: false,
         speed: 1.1, // 日本橋へ向かって進む (里程が減る向き)
         scolded: false,
+        // 供の目に付いていた度合い。速さと近さで溜まり、溢れると咎められる。
+        exposure: 0,
+        ran: false,
+        blocked: false,
+        slipped: false,
         note: spec.note,
         members,
       });
@@ -449,7 +469,7 @@ export class Crowd {
     }
     if (moved) this.procMesh.instanceMatrix.needsUpdate = true;
 
-    events.push(...this._checkProcession(player, nowMinutes));
+    events.push(...this._checkProcession(dtGame, player, nowMinutes));
     events.push(...this._checkStatics(player, nowMinutes));
     events.push(...this._checkMovers(player, nowMinutes));
     events.push(...this._checkHit(this.dogs, player, nowMinutes, {
@@ -504,7 +524,18 @@ export class Crowd {
     return events;
   }
 
-  _checkProcession(player, nowMinutes) {
+  /**
+   * 大名行列。
+   *
+   * 街道でいちばん重い障害である。作法どおりなら道の端へ寄って下座し、
+   * 行列が過ぎるのを待つ。飛脚は御用の急ぎなので黙認されることもあったが、
+   * 供の目に留まれば咎められた。
+   *
+   * ここを「必ず咎められる」ではなく賭けにしてある。端へ寄るほど、
+   * 速さを落とすほど見咎められにくい。刻限に追われていれば脇を抜ける
+   * 手もあるが、捕まれば下座するよりずっと高くつく。
+   */
+  _checkProcession(dt, player, nowMinutes) {
     const events = [];
     for (const p of this.processions) {
       const ahead = p.center - p.halfLen - player.s;
@@ -513,30 +544,63 @@ export class Crowd {
         events.push({
           type: 'warn',
           title: '下に居ろ',
-          text: `${p.note}。道の端へ寄り、歩みを緩めて行き過ごせ。`,
+          text: `${p.note}。列は道の中ほどを行く。端いっぱいへ寄れば脇を抜けられるが、寄りが甘いと見咎められる。`,
         });
       }
 
       const inside = Math.abs(player.s - p.center) < p.halfLen;
-      if (!inside) continue;
+      if (!inside) {
+        // 抜けきった。列に阻まれずに走り抜けて咎めも無ければ、それは手柄。
+        if (p.ran && !p.blocked && !p.scolded && !p.slipped && player.s > p.center) {
+          p.slipped = true;
+          events.push({ type: 'slip', title: '脇を抜けた', text: '供の目を盗んで行列を追い越した。' });
+        }
+        continue;
+      }
 
       const half = this.route.widthAt(player.s) / 2;
-      const clearance = half * 0.5 + 0.9;
+      // 列の占める幅。ここへ入れば進めない。
+      const column = half * 0.45 + 0.4;
+      const edge = Math.abs(player.u);
 
-      if (player.speed > SPEED.walk * 1.45 && !p.scolded) {
-        // ゲーム内の分。時間圧縮が三倍なので、実際に待つのは四十秒ほど。
-        // これ以上長くすると、ただ立たされるだけの間が退屈になる。
+      if (edge < column) {
+        // 列のなかは通れない。人の背に阻まれて摺り足でしか進めない。
+        // ここを速く抜けられてしまうと、脇を賭ける意味が無くなる。
+        p.blocked = true;
+        player.speed = Math.min(player.speed, 0.4);
+        if (player.speed > 0.3) {
+          events.push({ type: 'jostle', text: '行列に阻まれた。道の端へ寄れ。', quiet: true });
+        }
+        continue;
+      }
+
+      if (player.speed <= SPEED.walk * 1.45 || p.scolded) continue;
+      p.ran = true;
+
+      // 見咎められやすさ。速いほど、列に近いほど目に付く。
+      // 隔たりは道幅で測る。狭い街道ほど脇を抜けるのは難しい。
+      const speedF = THREE.MathUtils.clamp(
+        (player.speed - SPEED.walk * 1.45) / (SPEED.run - SPEED.walk * 1.45), 0, 1.3
+      );
+      const room = Math.max(0.2, player.maxLateral - column);
+      const nearF = THREE.MathUtils.clamp(1 - (edge - column) / room, 0, 1);
+      // 列の長さで割る。長い列ほど目に触れる時間が延びるが、それは
+      // 通り抜けに要る時間そのものが延びることで既に効いている。
+      // ここまで長さで二重に効かせると、長い列は端を走っても必ず捕まる。
+      const span = (p.halfLen * 2) / 147;
+      p.exposure += (dt * speedF * (0.022 + 0.038 * nearF)) / span;
+
+      if (p.exposure > 1) {
+        // ゲーム内の分。時間圧縮が三倍なので、実際に待つのは三十秒ほど。
+        // 行列への無礼は軽い咎めでは済まない。下座して行き過ごすより
+        // 高くつく罰でないと、常に駆け抜けるのが最善になってしまう。
         p.scolded = true;
-        player.stun(nowMinutes, 2);
+        player.stun(nowMinutes, 3);
         events.push({
           type: 'rude',
           title: '無礼者',
-          text: '大名行列を駆け抜けようとして咎められた。しばし足止め。',
+          text: '供に見咎められた。ひれ伏して行列を見送る。',
         });
-      } else if (Math.abs(player.u) < clearance && player.speed > SPEED.walk * 0.6) {
-        // 列に突っ込んだ
-        player.speed = Math.min(player.speed, SPEED.walk * 0.5);
-        events.push({ type: 'jostle', text: '行列に阻まれた。道の端へ寄れ。', quiet: true });
       }
     }
     return events;
