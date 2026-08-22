@@ -93,6 +93,8 @@ async function buildStage(id) {
     phase: 'idle',
     seenLandmarks: new Set(),
     penalties: 0,
+    /** 行列の脇を咎められずに抜けた数。 */
+    slips: 0,
     bumps: 0,
     gatePassedAt: null,
     finishedAt: null,
@@ -259,6 +261,7 @@ function startRun() {
   st.landmarks.setGateClosed(false);
   st.seenLandmarks.clear();
   st.penalties = 0;
+  st.slips = 0;
   st.bumps = 0;
   st.gatePassedAt = null;
   st.finishedAt = null;
@@ -331,6 +334,9 @@ function step(dtWall) {
   for (const ev of crowd.update(dt, player, clock.minutes)) {
     if (ev.type === 'rude') {
       stage.penalties += 1;
+      hud.toast(`${ev.title} — ${ev.text}`, { strong: true });
+    } else if (ev.type === 'slip') {
+      stage.slips += 1;
       hud.toast(`${ev.title} — ${ev.text}`, { strong: true });
     } else if (ev.type === 'warn') {
       hud.toast(`${ev.title} — ${ev.text}`, { strong: true });
@@ -430,7 +436,7 @@ function updateFerry(dtWall, dt) {
       const spent = Math.min(dtWall, ferry.wait);
       ferry.wait -= spent;
       // 待った分の刻。史料どおりの分数を、縮めた実時間のあいだに進める。
-      clock.advance((c.waitMinutes * 60 * spent) / FERRY_WAIT_WALL);
+      clock.advance((ferry.minutes * 60 * spent) / ferry.waitWall);
       // HUD の足止め表示を使う。残り秒がそのまま出るように刻へ換算しておく。
       player.stunUntil = clock.minutes + (ferry.wait * TIME_SCALE) / 60;
       player.speed = 0;
@@ -463,8 +469,27 @@ function updateFerry(dtWall, dt) {
   if (!next || player.s < next.near) return;
 
   player.s = next.near;
-  stage.ferry = { crossing: next, boarded: false, s: next.near, wait: FERRY_WAIT_WALL };
-  hud.toast(`${next.at}。舟を待つ。刻を ${next.waitMinutes} 分ほど食う。`, { strong: true });
+
+  // 増水。川留めまで行かずとも、水嵩が増せば舟の出は遅くなる。
+  // 走るたびに変わるので、渡しのある街道は同じ道中にならない。
+  // 増しかたを大きく取りすぎると、運だけで刻限を落とすことになる。
+  const swollen = Math.random() < 0.3;
+  const minutes = swollen ? Math.round(next.waitMinutes * 1.5) : next.waitMinutes;
+  const waitWall = FERRY_WAIT_WALL * (swollen ? 1.4 : 1);
+  stage.ferry = {
+    crossing: next,
+    boarded: false,
+    s: next.near,
+    wait: waitWall,
+    waitWall,
+    minutes,
+  };
+  hud.toast(
+    swollen
+      ? `${next.at}。水嵩が増している。舟の出を待つ。刻を ${minutes} 分ほど食う。`
+      : `${next.at}。舟を待つ。刻を ${minutes} 分ほど食う。`,
+    { strong: true }
+  );
 }
 
 /** HUD を書き換える間隔 (秒)。 */
