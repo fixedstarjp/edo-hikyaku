@@ -314,10 +314,79 @@
       ]
     },
     {
+      "id": "nakasendo-03",
+      "road": "中山道",
+      "stage": 3,
+      "order": 14,
+      "name": "蕨宿 → 浦和宿",
+      "from": "蕨宿",
+      "to": "浦和宿",
+      "summary": "一里十四町の短い区間。辻・六辻と在方の道を行き、焼米坂を上がって浦和へ入る。宿の手前に鳥居を持たぬ調の宮があり、兎を神使とする。",
+      "totalLength": 5031.6,
+      "historicalDistance": {
+        "ri": 1,
+        "cho": 14,
+        "km": 5.5,
+        "source": "日本橋〜浦和宿 六里六町から、日本橋〜蕨宿 四里二十八町を差し引いた値"
+      },
+      "stats": {
+        "minElevation": 4.66,
+        "maxElevation": 16.14,
+        "maxGradePermil": 25
+      },
+      "crossings": []
+    },
+    {
+      "id": "nakasendo-04",
+      "road": "中山道",
+      "stage": 4,
+      "order": 15,
+      "name": "浦和宿 → 大宮宿",
+      "from": "浦和宿",
+      "to": "大宮宿",
+      "summary": "浦和の市の町を出て、針ヶ谷・上木崎と大宮台地の背をゆるやかに北へ。宿の手前で氷川の参道が右へ分かれ、その先が武蔵一宮の門前町、大宮宿である。",
+      "totalLength": 5831.2,
+      "historicalDistance": {
+        "ri": 1,
+        "cho": 10,
+        "km": 5,
+        "source": "日本橋〜大宮宿 七里十六町から、日本橋〜浦和宿 六里六町を差し引いた値。ただし浦和宿と大宮宿の本陣は直線でも 5.7km 離れており、一里十町は道なりに測った値としては短すぎる"
+      },
+      "stats": {
+        "minElevation": 11.45,
+        "maxElevation": 14.02,
+        "maxGradePermil": 10
+      },
+      "crossings": []
+    },
+    {
+      "id": "nakasendo-05",
+      "road": "中山道",
+      "stage": 5,
+      "order": 16,
+      "name": "大宮宿 → 上尾宿",
+      "from": "大宮宿",
+      "to": "上尾宿",
+      "summary": "武蔵一宮の門前町を出て、大宮台地の背を北へ二里。右手に氷川の杜を見送り、東大成・加茂宮・宮原と在方の村を継いで、上尾の宿へ入る。",
+      "totalLength": 8228.6,
+      "historicalDistance": {
+        "ri": 2,
+        "cho": 0,
+        "km": 7.9,
+        "source": "中山道、大宮宿〜上尾宿 二里。日本橋からは九里十六町"
+      },
+      "stats": {
+        "minElevation": 12.45,
+        "maxElevation": 17.04,
+        "maxGradePermil": 11.3
+      },
+      "crossings": []
+    },
+    {
       "id": "nikko-01",
       "road": "日光道中・奥州道中",
       "stage": 1,
-      "order": 14,
+      "order": 17,
       "name": "日本橋 → 千住宿",
       "from": "日本橋",
       "to": "千住宿",
@@ -339,7 +408,7 @@
       "id": "oyama-01",
       "road": "大山道",
       "stage": 1,
-      "order": 15,
+      "order": 18,
       "name": "赤坂御門 → 三軒茶屋",
       "from": "赤坂御門",
       "to": "三軒茶屋",
@@ -361,7 +430,7 @@
       "id": "azabu-01",
       "road": "麻布 坂めぐり",
       "stage": 1,
-      "order": 16,
+      "order": 19,
       "name": "飯倉 → 六本木",
       "from": "飯倉",
       "to": "六本木",
