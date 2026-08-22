@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PALETTE } from '../core/palette.js';
 import { makeRng } from '../core/rng.js';
+import { pineFoliageGeometry } from './townscape.js';
 import { roofPrism, mergeGeometries, groundedBox } from '../core/geometry.js';
 import { FERRY_DECK, FERRY_DRAFT, FERRY_LANDING } from '../core/route.js';
 
@@ -71,7 +72,9 @@ export class Landmarks {
           if (lm.terraces) this._slope(lm);
           break;
         case 'view':
-          if (!lm.moat) this._viewpoint(lm);
+          // 木立を持つ名所は並木そのものが見どころ。眺望の造作を重ねると
+          // 松並木のあいだに別の木が五本生えることになる。
+          if (!lm.moat && !lm.grove) this._viewpoint(lm);
           break;
         case 'watashi':
           // 船着場も舟も _buildFerries が組む。ここでは何も足さない。
@@ -636,19 +639,36 @@ export class Landmarks {
     const { side = 0, count = 10, spanM = 120, heightM = [8, 13], nearM = [2.5, 7] } = lm.grove;
     const rng = makeRng(Math.round(lm.s) * 7 + 13);
 
+    // 松並木と榎や欅を同じ玉で建てると、街道の松がぜんぶ広葉樹になってしまう。
+    // 名に松とある木立は町並みの松と同じ葉の形にする。grove.tree で明示もできる。
+    const kind = lm.grove.tree ?? (lm.name.includes('松') ? 'matsu' : 'hiroha');
+
     for (let k = 0; k < count; k++) {
       const s = lm.s + (count === 1 ? 0 : rng.range(-spanM / 2, spanM / 2));
       const half = route.widthAt(s) / 2;
       const at = this._at(s, (side === 0 ? (rng.chance(0.5) ? -1 : 1) : side) * (half + rng.range(nearM[0], nearM[1])));
       const h = rng.range(heightM[0], heightM[1]);
 
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(h * 0.035, h * 0.055, h, 7), materials.wood);
-      trunk.position.copy(at.pos).setY(at.pos.y + h / 2);
+      // 松は幹が高くまで立ち、葉は上のほうだけに載る
+      const trunkH = kind === 'matsu' ? h * 0.7 : h;
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(h * 0.035, h * 0.055, trunkH, 7),
+        materials.wood
+      );
+      trunk.position.copy(at.pos).setY(at.pos.y + trunkH / 2);
       this.group.add(trunk);
 
-      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(h * rng.range(0.34, 0.46), 1), materials.tree);
-      crown.position.copy(at.pos).setY(at.pos.y + h * 0.92);
-      crown.scale.y = 0.78;
+      let crown;
+      if (kind === 'matsu') {
+        crown = new THREE.Mesh(pineCrown(), materials.tree);
+        crown.position.copy(at.pos).setY(at.pos.y + h * 0.58);
+        crown.scale.set(h * rng.range(0.46, 0.62), h * rng.range(0.46, 0.6), h * rng.range(0.46, 0.62));
+        crown.rotation.y = rng() * Math.PI * 2;
+      } else {
+        crown = new THREE.Mesh(new THREE.IcosahedronGeometry(h * rng.range(0.34, 0.46), 1), materials.tree);
+        crown.position.copy(at.pos).setY(at.pos.y + h * 0.92);
+        crown.scale.y = 0.78;
+      }
       this.group.add(crown);
     }
   }
@@ -756,4 +776,11 @@ function rampFactor(s, c) {
     ? (s - (c.near - FERRY_LANDING)) / FERRY_LANDING
     : ((c.far + FERRY_LANDING) - s) / FERRY_LANDING;
   return t * t * (3 - 2 * t);
+}
+
+/** 松の葉は形が一つで足りる。木ごとに組み直さず使い回す。 */
+let _pineCrown = null;
+function pineCrown() {
+  if (!_pineCrown) _pineCrown = pineFoliageGeometry();
+  return _pineCrown;
 }

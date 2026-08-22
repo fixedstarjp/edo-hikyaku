@@ -38,6 +38,8 @@ export function createMaterials() {
     plaster: toon(PALETTE.kabe, { side: THREE.DoubleSide }),
     turf: toon(0x6d7d55, { side: THREE.DoubleSide }),
     canal: toon(0x35566d, { side: THREE.DoubleSide }),
+    // 町の用水は堀ほど深くない。底の石が透けるので堀より淡く濁らせる。
+    mizo: toon(0x46626b, { side: THREE.DoubleSide }),
     bengara: toon(PALETTE.bengara),
     iron: toon(0x3a3a3c),
     brass: toon(0x9a7d3c),
