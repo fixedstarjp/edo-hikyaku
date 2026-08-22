@@ -15,13 +15,32 @@ import { mergeGeometries, roofPrism, groundedBox } from '../core/geometry.js';
  * それぞれ InstancedMesh 一つにまとめるので、千軒建てても描画は五回で済む。
  */
 
-const WALL_COLORS = [0xcabb9c, 0xbdaf92, 0xae9f83, 0xd2c4a6, 0xb6a98f];
-const ROOF_COLORS = [0x3f434a, 0x494d54, 0x55503f, 0x383c42, 0x635842];
-const NOREN_COLORS = [0x2c4a72, 0x8f3a28, 0x2f3a33, 0x574063, 0x7a5a26];
+/**
+ * 町の色。
+ *
+ * 江戸の町家は白い町ではない。柱も板壁も雨と日に灼けて煤けた茶になり、
+ * そこへ土蔵と塗屋の白漆喰がとびとびに混じる。壁を生成り一色で塗ると
+ * 明るい南欧の町になってしまうので、板壁を主にして漆喰を差し色に回す。
+ */
+const WALL_TIMBER = [0x8b7357, 0x977f62, 0x7d6a52, 0x9d8464, 0x87715a, 0x917a5e];
+const WALL_PLASTER = [0xdcd3bd, 0xd2c8b0, 0xe5dcc7];
+/** 立て看板の板。日に灼けた白木。 */
+const KANBAN_COLORS = [0xc3ae8a, 0xb5a07d, 0xcdb994];
+const ROOF_KAWARA = [0x4a4e56, 0x545860, 0x3f434a, 0x585c63, 0x44474d];
+/** 茅と板葺き。瓦は町場の作りで、在方では茅のほうが多い。 */
+const ROOF_KAYA = [0x9b8659, 0xa89265, 0x8c7950, 0xb19b6d];
+/** 暖簾は藍と柿渋が主。日除けの大暖簾は晒しの生成り。 */
+const NOREN_COLORS = [0x2c4a72, 0x8f3a28, 0x2f3a33, 0x574063, 0x7a5a26, 0x1f3a5c];
+const HIYOKE_COLORS = [0xded3ba, 0xd5c9ae, 0xe4dac4];
+
+const pick = (list, rng) => list[rng.int(0, list.length - 1)];
 
 export function buildTownscape(route, materials) {
   const rng = makeRng(WORLD_SEED);
   const group = new THREE.Group();
+
+  // 用水の溝は町の片側だけに掘る。どちら側かは宿によって違うので籤で決める。
+  const gutterSide = rng.chance(0.5) ? -1 : 1;
 
   const parts = {
     bodies: [], roofs: [], eaves: [], fronts: [], norens: [], pines: [],
@@ -54,6 +73,8 @@ export function buildTownscape(route, materials) {
           if (rng.chance(0.3)) {
             addBuilding(parts, sample, side, half, rng, {
               storeys: 1, width: [4.5, 7], depth: [5, 7], setback: [3.5, 6], shop: true,
+              // 在方の茶屋を瓦で葺くことはまず無い
+              thatch: 0.82,
             });
           } else {
             parts.pines.push(makePine(sample, side, half, rng));
@@ -63,10 +84,13 @@ export function buildTownscape(route, materials) {
 
         const spec =
           sec.kind === 'yashiki'
-            ? { storeys: 1, width: [9, 18], depth: [7, 12], setback: [2.5, 5.5], shop: false }
+            ? { storeys: 1, width: [9, 18], depth: [7, 12], setback: [2.5, 5.5], shop: false, thatch: 0.34 }
             : sec.kind === 'shuku'
-              ? { storeys: 2, width: [4, 7], depth: [7, 11], shop: true }
-              : { storeys: sec.storeys, width: [3.4, 6.4], depth: [6, 11], shop: true };
+              ? { storeys: 2, width: [4, 7], depth: [7, 11], shop: true, thatch: 0.26 }
+              : { storeys: sec.storeys, width: [3.4, 6.4], depth: [6, 11], shop: true, thatch: 0.14 };
+
+        // 溝のある側は家を下げる。溝の上に建てるわけにいかない。
+        if (side === gutterSide) spec.setback = [1.65, (spec.setback?.[1] ?? 1.4) + 1.65];
 
         // 土蔵は町家の代わりに建てる。道に面していないと白い壁が見えない。
         if ((sec.kind === 'machiya' || sec.kind === 'shuku') && rng.chance(0.09)) {
@@ -107,6 +131,7 @@ export function buildTownscape(route, materials) {
     }
   }
 
+  addFences(parts, route, rng, gutterSide, blocked);
   addRoadside(parts, route, rng);
 
   group.add(instanced(bodyGeometry(), materials.building, parts.bodies));
@@ -125,7 +150,183 @@ export function buildTownscape(route, materials) {
   group.add(instanced(stallGeometry(), materials.wood, parts.stalls));
   group.add(instanced(bodyGeometry(), materials.thatch, parts.stallRoofs));
   group.add(instanced(kuraGeometry(), materials.plaster, parts.kura));
+
+  for (const mesh of buildGutter(route, materials, gutterSide, rng)) group.add(mesh);
   return group;
+}
+
+/**
+ * 町の用水。
+ *
+ * 宿場や町場の道端には水を流す溝が掘ってある。防火の用水であり、
+ * 生活の排水路でもあり、道と屋敷地の境でもあった。家々はここに板を
+ * 渡して出入りしたので、通りには一間おきに小さな橋が架かる。
+ *
+ * 溝は町のあるところだけ。松並木の在方には掘らない。
+ */
+function buildGutter(route, materials, side, rng) {
+  const runs = townRuns(route);
+  if (!runs.length) return [];
+
+  const STEP = 3;
+  const stone = [];
+  const water = [];
+  const planks = [];
+  const sample = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
+
+  for (const run of runs) {
+    const rows = [];
+    for (let s = run.from; s <= run.to; s += STEP) rows.push(s);
+    if (rows.length < 2) continue;
+    if (rows[rows.length - 1] < run.to) rows.push(run.to);
+
+    // 溝の断面。手前の石縁、溝底、向こうの石縁の六列。
+    const trough = [
+      { o: 0.05, y: 0.02 },
+      { o: 0.22, y: 0.24 },
+      { o: 0.38, y: -0.14 },
+      { o: 1.08, y: -0.14 },
+      { o: 1.24, y: 0.24 },
+      { o: 1.42, y: 0.02 },
+    ];
+    stone.push(ribbon(route, sample, rows, side, trough));
+    water.push(ribbon(route, sample, rows, side, [{ o: 0.4, y: -0.09 }, { o: 1.06, y: -0.09 }]));
+
+    // 板橋。家の出入口ごとに架かるので、間隔は町家の間口くらい。
+    for (let s = run.from + 4; s < run.to - 4; s += rng.range(7, 16)) {
+      route.sample(s, 0, sample);
+      const half = route.widthAt(s) / 2;
+      const u = side * (half + 0.73);
+      planks.push({
+        pos: new THREE.Vector3(
+          sample.pos.x + sample.left.x * u,
+          sample.pos.y + 0.26,
+          sample.pos.z + sample.left.z * u
+        ),
+        yaw: Math.atan2(-sample.tangent.z, sample.tangent.x),
+        scale: new THREE.Vector3(rng.range(1.3, 2.1), 0.12, 1.55),
+      });
+    }
+  }
+
+  const out = [];
+  if (stone.length) out.push(new THREE.Mesh(mergeGeometries(stone), materials.stone));
+  if (water.length) out.push(new THREE.Mesh(mergeGeometries(water), materials.mizo));
+  if (planks.length) out.push(instanced(plankGeometry(), materials.deck, planks));
+  for (const m of out) m.name = 'gutter';
+  return out;
+}
+
+/** 町家の並ぶ区間をひと続きにまとめる。松並木で切れる。 */
+function townRuns(route) {
+  const runs = [];
+  for (const sec of route.sections) {
+    if (sec.kind === 'kaido') continue;
+    const from = sec.from;
+    const to = Math.min(sec.to, route.length);
+    if (to - from < 12) continue;
+    const last = runs[runs.length - 1];
+    if (last && from - last.to < 1) last.to = to;
+    else runs.push({ from, to });
+  }
+  // 渡しの上には溝を通さない
+  return runs.filter((r) => route.crossingDropAt((r.from + r.to) / 2) <= 0.25);
+}
+
+/**
+ * 街道に沿って断面を掃いた帯を一枚作る。
+ * spec は中心からの横ずれ o と路面からの高さ y の列。
+ */
+function ribbon(route, sample, rows, side, spec) {
+  const n = rows.length;
+  const cols = spec.length;
+  const pos = new Float32Array(n * cols * 3);
+  for (let i = 0; i < n; i++) {
+    const s = rows[i];
+    route.sample(s, 0, sample);
+    const half = route.widthAt(s) / 2;
+    for (let c = 0; c < cols; c++) {
+      const u = side * (half + spec[c].o);
+      const o = (i * cols + c) * 3;
+      pos[o] = sample.pos.x + sample.left.x * u;
+      pos[o + 1] = sample.pos.y + spec[c].y;
+      pos[o + 2] = sample.pos.z + sample.left.z * u;
+    }
+  }
+  const idx = [];
+  for (let i = 0; i < n - 1; i++) {
+    for (let c = 0; c < cols - 1; c++) {
+      const a = i * cols + c;
+      const b = a + 1;
+      const d = a + cols;
+      const e = d + 1;
+      if (side > 0) idx.push(a, d, b, b, d, e);
+      else idx.push(a, b, d, b, e, d);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** 溝に渡す板。二枚並べて端を揃える。 */
+function plankGeometry() {
+  return mergeGeometries([
+    groundedBox(1, 1, 0.46, 0, -0.5, -0.26),
+    groundedBox(1, 1, 0.46, 0, -0.5, 0.26),
+  ]);
+}
+
+/**
+ * 屋敷町の板塀。
+ *
+ * 武家屋敷や寺の門前は、通りに面して長い塀が続く。町家のように店が
+ * 開いていないので、塀が無いと家並みのあいだが野原に見えてしまう。
+ * 一枚ずつ立てて継いでゆき、途中に門の切れ目を入れる。
+ */
+function addFences(parts, route, rng, gutterSide, blocked) {
+  const sample = { pos: new THREE.Vector3(), tangent: new THREE.Vector3(), left: new THREE.Vector3() };
+  const PANEL = 4;
+
+  for (const sec of route.sections) {
+    if (sec.kind !== 'yashiki') continue;
+    const to = Math.min(sec.to, route.length);
+    for (let s = sec.from; s < to; s += PANEL) {
+      for (const side of [-1, 1]) {
+        if (blocked(s, side)) continue;
+        if (route.crossingDropAt(s) > 0.25) continue;
+        // 門口。ここだけ塀を抜く。
+        if (rng.chance(0.14)) continue;
+
+        route.sample(s + PANEL / 2, 0, sample);
+        const half = route.widthAt(s) / 2;
+        const u = side * (half + (side === gutterSide ? 1.62 : 0.55));
+        const yaw = Math.atan2(-sample.tangent.z, sample.tangent.x);
+        const base = new THREE.Vector3(
+          sample.pos.x + sample.left.x * u,
+          sample.pos.y - 0.1,
+          sample.pos.z + sample.left.z * u
+        );
+        const fh = rng.range(1.75, 2.05);
+
+        parts.bodies.push({
+          pos: base,
+          yaw,
+          // 継ぎ目が開かないよう一枚を少し長く取る
+          scale: new THREE.Vector3(PANEL + 0.2, fh, 0.18),
+          color: new THREE.Color(pick(WALL_TIMBER, rng)).multiplyScalar(rng.range(0.5, 0.66)),
+        });
+        // 笠木。塀の上に一本被せる。
+        parts.eaves.push({
+          pos: base.clone().setY(base.y + fh),
+          yaw,
+          scale: new THREE.Vector3(PANEL + 0.28, 0.13, 0.34),
+        });
+      }
+    }
+  }
 }
 
 /**
@@ -221,13 +422,26 @@ function keepClearZones(route) {
 
 /**
  * 一軒建てる。
+ *
+ * 江戸の町家の見えかたを決めているのは三つ。
+ *
+ *   低い二階 … 二階は天井の低い中二階で、一階の背丈には届かない。
+ *              総二階に組むと街道が谷底になり、見上げる町になってしまう。
+ *   深い庇  … 一階の上に一間近く突き出す下屋。通りに一本の濃い影が走り、
+ *              その下が店になる。町並みを横に貫くこの線が江戸の通りの骨格。
+ *   暗い一階 … 店先は建具を外して開け放つので、庇の影と合わせて黒く沈む。
+ *              明るい壁が地面まで下りてくると、板張りの町に見えない。
+ *
  * @returns {{reach:number}} 街道中心からこの家の裏側までの距離。裏の列を置くのに使う。
  */
 function addBuilding(parts, sample, side, half, rng, spec) {
   const w = rng.range(spec.width[0], spec.width[1]);
   const d = rng.range(spec.depth[0], spec.depth[1]);
-  const storeyH = rng.range(2.5, 3.05);
-  const h = spec.storeys === 2 ? storeyH * 2 - rng.range(0.2, 0.6) : storeyH * rng.range(0.85, 1.05);
+
+  const groundH = rng.range(2.4, 2.85);
+  // 中二階。通し柱の二階を建てるのは表通りの大店くらいで、宿場では稀。
+  const upperH = spec.storeys === 2 ? groundH * rng.range(0.58, 0.78) : 0;
+  const h = groundH + upperH;
 
   const setbackRange = spec.setback ?? [0.5, 1.4];
   const setback = rng.range(setbackRange[0], setbackRange[1]);
@@ -242,49 +456,104 @@ function addBuilding(parts, sample, side, half, rng, spec) {
   // 街道を向く面へ向かう向き
   const toRoad = new THREE.Vector3(sample.left.x, 0, sample.left.z).multiplyScalar(-side);
 
-  const wall = new THREE.Color(WALL_COLORS[rng.int(0, WALL_COLORS.length - 1)]);
-  const roof = new THREE.Color(ROOF_COLORS[rng.int(0, ROOF_COLORS.length - 1)]);
+  // 塗屋造の白壁は四、五軒に一軒。板壁ばかりだと通りが茶一色になり、
+  // 多すぎると漆喰の町になる。
+  const plaster = rng.chance(0.26);
+  const wall = new THREE.Color(pick(plaster ? WALL_PLASTER : WALL_TIMBER, rng));
+  // 一階は同じ材の暗いほう。軒の影に沈んだ店先の色。
+  const lower = wall.clone().multiplyScalar(rng.range(0.4, 0.54));
 
-  parts.bodies.push({ pos: base, yaw, scale: new THREE.Vector3(w, h, d), color: wall });
+  const kaya = rng.chance(spec.thatch ?? 0.2);
+  const roof = new THREE.Color(pick(kaya ? ROOF_KAYA : ROOF_KAWARA, rng));
 
+  parts.bodies.push({ pos: base, yaw, scale: new THREE.Vector3(w, groundH, d), color: lower });
+  if (upperH > 0) {
+    parts.bodies.push({
+      pos: base.clone().setY(base.y + groundH),
+      yaw,
+      scale: new THREE.Vector3(w, upperH, d * 0.99),
+      color: wall,
+    });
+  }
+
+  // 屋根。茅は瓦より勾配を急に葺く。水を早く落とさないと腐るからである。
+  const pitch = kaya ? rng.range(0.44, 0.56) : rng.range(0.3, 0.38);
+  const over = kaya ? 1.34 : 1.28;
+  // 妻入り。棟を街道と直角に振った家をたまに混ぜると、軒の列に切れ目ができる。
+  const tsuma = spec.shop && rng.chance(0.12);
   parts.roofs.push({
     pos: base.clone().setY(base.y + h),
-    yaw,
-    scale: new THREE.Vector3(w * 1.22, d * rng.range(0.26, 0.34), d * 1.16),
+    yaw: tsuma ? yaw + Math.PI / 2 : yaw,
+    scale: tsuma
+      ? new THREE.Vector3(d * over, w * pitch * 0.72, w * (over - 0.05))
+      : new THREE.Vector3(w * over, d * pitch, d * (over - 0.05)),
     color: roof,
   });
 
-  // 軒 — 屋根の下に一本影の線を入れる。屋根の出より内側に収める。
+  // 軒裏。屋根の下端に合わせて暗い板を一枚入れる。屋根と壁のあいだが
+  // 抜けて見えるのを塞ぎつつ、軒の出の影になる。
   parts.eaves.push({
-    pos: base.clone().setY(base.y + h - 0.09),
-    yaw,
-    scale: new THREE.Vector3(w * 1.2, 0.18, d * 1.12),
+    pos: base.clone().setY(base.y + h - 0.14),
+    yaw: tsuma ? yaw + Math.PI / 2 : yaw,
+    scale: tsuma
+      ? new THREE.Vector3(d * over * 0.98, 0.24, w * (over - 0.05) * 0.98)
+      : new THREE.Vector3(w * over * 0.98, 0.24, d * (over - 0.05) * 0.98),
   });
 
   if (spec.shop) {
-    // 腰壁と格子。店は道にぴたりと面する。
-    parts.fronts.push({
-      pos: base.clone().addScaledVector(toRoad, d / 2 + 0.06).setY(base.y + h * 0.24),
+    // 下屋。一階の上から街道へ差し掛ける。これが通りの影の線になる。
+    const out = rng.range(1.15, 1.55);
+    parts.eaves.push({
+      pos: base.clone().addScaledVector(toRoad, d / 2 + out / 2 - 0.08).setY(base.y + groundH - 0.16),
       yaw,
-      scale: new THREE.Vector3(w * 0.97, h * 0.48, 0.14),
+      scale: new THREE.Vector3(w * 1.04, 0.22, out),
     });
 
-    if (rng.chance(0.62)) {
-      // 暖簾は店口の上端に垂らす
+    // 店先。建具を外して開ける一階の間口。腰の高さから庇まで暗く落とす。
+    parts.fronts.push({
+      pos: base.clone().addScaledVector(toRoad, d / 2 + 0.07).setY(base.y + 0.28),
+      yaw,
+      scale: new THREE.Vector3(w * 0.94, groundH - 0.5, 0.14),
+    });
+
+    // 日除けの大暖簾。庇の先から下ろす晒し木綿。丈は人の背より短く、
+    // 潜って店に入れるだけの隙間を残す。
+    if (rng.chance(0.3)) {
+      const hh = rng.range(0.7, 0.95);
       parts.norens.push({
-        pos: base.clone().addScaledVector(toRoad, d / 2 + 0.14).setY(base.y + h * 0.39),
+        pos: base
+          .clone()
+          .addScaledVector(toRoad, d / 2 + out - 0.22)
+          .setY(base.y + groundH - 0.3 - hh / 2),
         yaw,
-        scale: new THREE.Vector3(w * rng.range(0.6, 0.82), rng.range(0.42, 0.6), 0.08),
-        color: new THREE.Color(NOREN_COLORS[rng.int(0, NOREN_COLORS.length - 1)]),
+        scale: new THREE.Vector3(w * rng.range(0.72, 0.9), hh, 0.07),
+        color: new THREE.Color(pick(HIYOKE_COLORS, rng)),
+      });
+    } else if (rng.chance(0.62)) {
+      // 短い暖簾は店口の上端に垂らす
+      parts.norens.push({
+        pos: base.clone().addScaledVector(toRoad, d / 2 + 0.16).setY(base.y + groundH - 0.85),
+        yaw,
+        scale: new THREE.Vector3(w * rng.range(0.66, 0.88), rng.range(0.5, 0.68), 0.08),
+        color: new THREE.Color(pick(NOREN_COLORS, rng)),
       });
     }
 
-    if (spec.storeys === 2) {
-      // 一階と二階のあいだの庇。出は 80cm ほど。
-      parts.eaves.push({
-        pos: base.clone().addScaledVector(toRoad, d / 2 + 0.28).setY(base.y + h * 0.5),
+    // 立て看板。軒と庇で通りは横の線ばかりになるので、縦を一本立てて崩す。
+    // 店の端に寄せて置き、間口の真ん中を塞がない。
+    if (rng.chance(0.2)) {
+      const kh = rng.range(1.5, 2.0);
+      const along = new THREE.Vector3(sample.tangent.x, 0, sample.tangent.z)
+        .multiplyScalar((rng.chance(0.5) ? 1 : -1) * (w / 2 - 0.3));
+      parts.norens.push({
+        pos: base
+          .clone()
+          .add(along)
+          .addScaledVector(toRoad, d / 2 + rng.range(0.35, 0.7))
+          .setY(base.y + kh / 2),
         yaw,
-        scale: new THREE.Vector3(w * 1.05, 0.13, 0.8),
+        scale: new THREE.Vector3(rng.range(0.42, 0.6), kh, 0.11),
+        color: new THREE.Color(pick(KANBAN_COLORS, rng)),
       });
     }
   }
@@ -333,19 +602,24 @@ function pineTrunkGeometry() {
 }
 
 /**
- * 松の葉。杉のような円錐ではなく、平たい塊を段違いに重ねる。
- * 街道の松は幹が曲がり、葉が層になって横に張り出す。
+ * 松の葉。
+ *
+ * 円錐を積むと杉か樅になってしまう。街道の黒松は葉が平たい塊になって
+ * 横へ張り出し、段と段のあいだが透けて空が見える。だから層は平たい皿に
+ * 近づけ、互い違いに芯からずらして、上へゆくほど小さくする。
+ * 頂も尖らせない。松の梢は丸い。
  */
-function pineFoliageGeometry() {
+export function pineFoliageGeometry() {
   const parts = [];
   for (const l of [
-    { y: 0.0, r: 0.56, h: 0.24, x: -0.08, z: 0.05 },
-    { y: 0.2, r: 0.48, h: 0.22, x: 0.1, z: -0.06 },
-    { y: 0.42, r: 0.36, h: 0.2, x: -0.05, z: -0.02 },
-    { y: 0.62, r: 0.22, h: 0.18, x: 0.04, z: 0.04 },
+    { y: 0.0, r: 0.62, h: 0.15, x: -0.14, z: 0.09 },
+    { y: 0.19, r: 0.54, h: 0.13, x: 0.16, z: -0.11 },
+    { y: 0.36, r: 0.46, h: 0.13, x: -0.11, z: -0.13 },
+    { y: 0.53, r: 0.36, h: 0.12, x: 0.12, z: 0.12 },
+    { y: 0.69, r: 0.25, h: 0.12, x: -0.05, z: 0.03 },
   ]) {
-    const c = new THREE.ConeGeometry(l.r, l.h, 7, 1);
-    c.scale(1, 1, 1);
+    // 上面をわずかに残した截頭錐にすると、葉の塊が皿に見える
+    const c = new THREE.CylinderGeometry(l.r * 0.42, l.r, l.h, 8, 1);
     c.translate(l.x, l.y + l.h / 2, l.z);
     parts.push(c);
   }
