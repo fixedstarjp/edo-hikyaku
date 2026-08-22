@@ -174,35 +174,45 @@ export class Player {
     const stunned = nowMinutes < this.stunUntil;
     const gf = this.gradeFactor();
 
-    // 目標速度
+    // 目標速度。
+    // 押していれば走り、離せば駆け足に落ちて息が戻る。S で止まる。
+    // 息が切れるとどれより遅い足になり、自分から緩めるより損をする。
     let target;
-    if (stunned) {
+    if (stunned || input.back) {
       target = 0;
-    } else if (input.back) {
-      target = 0;
-    } else if (input.forward && !this.exhausted) {
-      target = (input.sprint && this.stamina > 1 ? SPEED.sprint : SPEED.run) * gf;
+    } else if (this.exhausted) {
+      target = SPEED.spent * gf;
     } else if (input.forward) {
-      target = SPEED.walk * gf; // 息が切れている
+      target = (input.sprint && this.stamina > 1 ? SPEED.sprint : SPEED.run) * gf;
     } else {
-      target = SPEED.walk * gf;
+      target = SPEED.jog * gf;
     }
 
     const rate = target > this.speed ? SPEED.accel : SPEED.brake;
     this.speed += THREE.MathUtils.clamp(target - this.speed, -rate * dt, rate * dt);
     this.speed = Math.max(0, this.speed);
 
-    // 息
-    const grade = Math.max(0, this.route.gradeAt(this.s));
-    const gradeCost = grade * STAMINA.gradePenalty;
-    if (this.speed > SPEED.walk * 1.15) {
-      const sprinting = input.sprint && !this.exhausted && this.speed > SPEED.run * 0.98;
+    // 息。上りは削り、下りは戻す。
+    const g = this.route.gradeAt(this.s);
+    const gradeCost =
+      g > STAMINA.gradeFree
+        ? (g - STAMINA.gradeFree) * STAMINA.gradePenalty
+        : g < -STAMINA.gradeFree
+          ? (g + STAMINA.gradeFree) * STAMINA.descentRelief
+          : 0;
+    // 速さではなく「何をしようとしているか」で決める。急な上りでは
+    // 走っていても駆け足より遅くなるので、速さで見分けると走りが休みになる。
+    const climb = Math.max(0, gradeCost) * 0.4;
+    if (this.exhausted) {
+      this.stamina += (STAMINA.spentRecover - climb) * dt;
+    } else if (!stunned && input.forward) {
+      const sprinting = input.sprint && this.speed > SPEED.run * 0.98;
       const drain = (sprinting ? STAMINA.sprintDrain : STAMINA.runDrain) + gradeCost;
       this.stamina -= drain * dt;
-    } else if (this.speed > 0.2) {
-      this.stamina += (STAMINA.walkRecover - gradeCost * 0.4) * dt;
+    } else if (stunned || input.back) {
+      this.stamina += ((this.speed > 0.2 ? STAMINA.walkRecover : STAMINA.idleRecover) - climb) * dt;
     } else {
-      this.stamina += STAMINA.idleRecover * dt;
+      this.stamina += (STAMINA.jogRecover - climb) * dt;
     }
     this.stamina = THREE.MathUtils.clamp(this.stamina, 0, STAMINA.max);
     if (this.stamina <= 0.01) this.exhausted = true;

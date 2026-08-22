@@ -40,6 +40,10 @@
           <div class="gauge-label">息</div>
           <div class="gauge-track"><div class="gauge-fill" id="stamina-fill"></div></div>
         </div>
+        <div class="ahead">
+          <div class="ahead-label">先の道</div>
+          <canvas id="grade-ahead" class="ahead-canvas" width="360" height="84"></canvas>
+        </div>
         <div class="readout">
           <span id="speed">0.0 km/h</span>
           <span id="grade">±0 ‰</span>
@@ -102,16 +106,16 @@
         <p class="title-brief" id="title-brief">街道データを読み込んでいます…</p>
 
         <div class="title-keys" id="title-keys">
-          <div><kbd>W</kbd>/<kbd>↑</kbd> 走る</div>
+          <div><kbd>W</kbd>/<kbd>↑</kbd> 走る／離せば駆け足で息が戻る</div>
           <div><kbd>Shift</kbd> 全力</div>
-          <div><kbd>S</kbd>/<kbd>↓</kbd> 緩める</div>
+          <div><kbd>S</kbd>/<kbd>↓</kbd> 止まる（行列には下座せよ）</div>
           <div><kbd>A</kbd><kbd>D</kbd> 避ける</div>
           <div><kbd>Space</kbd> 跳ぶ</div>
           <div><kbd>Q</kbd><kbd>E</kbd>／右ドラッグ よそ見（海や城が見える）</div>
           <div><kbd>V</kbd> 視点（目線・肩越し・遠見）</div>
         </div>
         <div class="title-keys touch-keys" id="title-keys-touch" hidden>
-          <div>左下の輪 — <b>上へ押しているあいだ走る</b>。離せば歩みに落ちる</div>
+          <div>左下の輪 — <b>上へ押しているあいだ走る</b>。離せば駆け足に落ちて息が戻る</div>
           <div>同じ輪を横へ倒して避ける（倒すほど大きく）／下へ引いて止まる</div>
           <div><b>◀ 見る ▶</b> — 押しているあいだ横を向く。離せば前へ戻る</div>
           <div>全力（押しっぱなし）と跳ぶ</div>
